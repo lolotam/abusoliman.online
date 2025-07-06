@@ -83,19 +83,19 @@ function updateStatistics() {
         // تحديث عدد المنتجات
         const totalProductsElement = document.getElementById('totalProducts');
         if (totalProductsElement) {
-            totalProductsElement.textContent = db.toArabicNumbers(stats.totalProducts);
+            totalProductsElement.textContent = db.toArabicNumbers(stats.totalProducts || 0);
         }
-        
+
         // تحديث عدد العملاء
         const totalCustomersElement = document.getElementById('totalCustomers');
         if (totalCustomersElement) {
-            totalCustomersElement.textContent = db.toArabicNumbers(stats.totalCustomers);
+            totalCustomersElement.textContent = db.toArabicNumbers(stats.totalCustomers || 0);
         }
-        
+
         // تحديث المنتجات منخفضة المخزون
         const lowStockElement = document.getElementById('lowStockItems');
         if (lowStockElement) {
-            lowStockElement.textContent = db.toArabicNumbers(stats.lowStockItems);
+            lowStockElement.textContent = db.toArabicNumbers(stats.lowStockItems || 0);
         }
 
         // تحديث إحصائيات الفواتير الجديدة
@@ -114,23 +114,23 @@ function updateInvoiceStatistics() {
         const now = new Date();
 
         // إجمالي الفواتير
-        const totalInvoices = sales.length + purchases.length;
+        const totalInvoices = (sales ? sales.length : 0) + (purchases ? purchases.length : 0);
         const totalInvoicesElement = document.getElementById('totalInvoices');
         if (totalInvoicesElement) {
-            totalInvoicesElement.textContent = db.toArabicNumbers(totalInvoices);
+            totalInvoicesElement.textContent = db.toArabicNumbers(totalInvoices || 0);
         }
 
         // فواتير اليوم
         const today = now.toDateString();
-        const todayInvoices = sales.filter(sale =>
-            new Date(sale.createdAt).toDateString() === today
-        ).length + purchases.filter(purchase =>
-            new Date(purchase.createdAt).toDateString() === today
-        ).length;
+        const todayInvoices = (sales ? sales.filter(sale =>
+            sale.createdAt && new Date(sale.createdAt).toDateString() === today
+        ).length : 0) + (purchases ? purchases.filter(purchase =>
+            purchase.createdAt && new Date(purchase.createdAt).toDateString() === today
+        ).length : 0);
 
         const todayInvoicesElement = document.getElementById('todayInvoices');
         if (todayInvoicesElement) {
-            todayInvoicesElement.textContent = db.toArabicNumbers(todayInvoices);
+            todayInvoicesElement.textContent = db.toArabicNumbers(todayInvoices || 0);
         }
 
         // فواتير هذا الأسبوع
@@ -138,28 +138,28 @@ function updateInvoiceStatistics() {
         weekStart.setDate(now.getDate() - now.getDay());
         weekStart.setHours(0, 0, 0, 0);
 
-        const weekInvoices = sales.filter(sale =>
-            new Date(sale.createdAt) >= weekStart
-        ).length + purchases.filter(purchase =>
-            new Date(purchase.createdAt) >= weekStart
-        ).length;
+        const weekInvoices = (sales ? sales.filter(sale =>
+            sale.createdAt && new Date(sale.createdAt) >= weekStart
+        ).length : 0) + (purchases ? purchases.filter(purchase =>
+            purchase.createdAt && new Date(purchase.createdAt) >= weekStart
+        ).length : 0);
 
         const weekInvoicesElement = document.getElementById('weekInvoices');
         if (weekInvoicesElement) {
-            weekInvoicesElement.textContent = db.toArabicNumbers(weekInvoices);
+            weekInvoicesElement.textContent = db.toArabicNumbers(weekInvoices || 0);
         }
 
         // فواتير هذا الشهر
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const monthInvoices = sales.filter(sale =>
-            new Date(sale.createdAt) >= monthStart
-        ).length + purchases.filter(purchase =>
-            new Date(purchase.createdAt) >= monthStart
-        ).length;
+        const monthInvoices = (sales ? sales.filter(sale =>
+            sale.createdAt && new Date(sale.createdAt) >= monthStart
+        ).length : 0) + (purchases ? purchases.filter(purchase =>
+            purchase.createdAt && new Date(purchase.createdAt) >= monthStart
+        ).length : 0);
 
         const monthInvoicesElement = document.getElementById('monthInvoices');
         if (monthInvoicesElement) {
-            monthInvoicesElement.textContent = db.toArabicNumbers(monthInvoices);
+            monthInvoicesElement.textContent = db.toArabicNumbers(monthInvoices || 0);
         }
 
     } catch (error) {
@@ -177,13 +177,18 @@ function updateAlerts() {
         const alerts = [];
         
         // تنبيهات المخزون المنخفض
-        if (stats.lowStockProducts.length > 0) {
+        if (stats.lowStockProducts && stats.lowStockProducts.length > 0) {
             stats.lowStockProducts.forEach(product => {
+                // التأكد من وجود البيانات المطلوبة
+                const productName = product.name || 'منتج غير محدد';
+                // استخدام totalQuantity بدلاً من quantity (حسب بنية البيانات في getQuickStats)
+                const productQuantity = product.totalQuantity !== undefined && product.totalQuantity !== null ? product.totalQuantity : 0;
+
                 alerts.push({
                     type: 'warning',
                     icon: 'fa-exclamation-triangle',
                     title: 'مخزون منخفض',
-                    message: `المنتج "${product.name}" متبقي منه ${db.toArabicNumbers(product.quantity)} فقط`,
+                    message: `المنتج "${productName}" متبقي منه ${db.toArabicNumbers(productQuantity)} فقط`,
                     time: 'الآن'
                 });
             });
@@ -191,16 +196,16 @@ function updateAlerts() {
         
         // تنبيهات الديون المستحقة
         const customers = db.getTable('customers');
-        const overdueCustomers = customers.filter(customer => 
-            customer.balance < 0 && customer.id !== 'guest'
-        );
-        
+        const overdueCustomers = customers && Array.isArray(customers) ? customers.filter(customer =>
+            customer && customer.balance < 0 && customer.id !== 'guest'
+        ) : [];
+
         if (overdueCustomers.length > 0) {
             alerts.push({
                 type: 'error',
                 icon: 'fa-money-bill-wave',
                 title: 'ديون مستحقة',
-                message: `يوجد ${db.toArabicNumbers(overdueCustomers.length)} عميل لديهم ديون مستحقة`,
+                message: `يوجد ${db.toArabicNumbers(overdueCustomers.length || 0)} عميل لديهم ديون مستحقة`,
                 time: 'اليوم'
             });
         }
@@ -356,7 +361,8 @@ function drawSimpleChart(ctx, labels, data) {
     for (let i = 0; i <= 5; i++) {
         const y = padding + (chartHeight / 5) * i;
         const value = maxValue - (maxValue / 5) * i;
-        ctx.fillText(db.toArabicNumbers(Math.round(value)), padding - 10, y + 4);
+        const roundedValue = Math.round(value || 0);
+        ctx.fillText(db.toArabicNumbers(roundedValue), padding - 10, y + 4);
     }
 }
 

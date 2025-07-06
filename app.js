@@ -22,27 +22,56 @@ function verifyPassword(password, hashedPassword) {
 
 // إنشاء المستخدم الافتراضي
 function createDefaultAdmin() {
-    const users = db.getTable('users');
+    try {
+        const users = db.getTable('users');
 
-    // التحقق من وجود المستخدم الافتراضي
-    const adminExists = users.find(user => user.username === 'admin');
+        // التحقق من وجود المستخدم الافتراضي
+        const adminExists = users.find(user => user.username === 'admin');
 
-    if (!adminExists) {
-        const defaultAdmin = {
-            id: 'admin_' + Date.now(),
+        if (!adminExists) {
+            const defaultAdmin = {
+                id: 'admin_' + Date.now(),
+                username: 'admin',
+                password: hashPassword('123'), // كلمة مرور افتراضية بسيطة - يجب تغييرها فوراً
+                fullName: 'المدير العام',
+                role: 'admin',
+                permissions: ['all'],
+                isActive: true,
+                createdAt: new Date().toISOString(),
+                lastLogin: null
+            };
+
+            users.push(defaultAdmin);
+            db.setTable('users', users);
+            console.log('تم إنشاء المستخدم الافتراضي: admin / 123');
+        } else {
+            console.log('المستخدم الافتراضي موجود بالفعل');
+        }
+
+        // التأكد من أن كلمة المرور صحيحة
+        const admin = users.find(user => user.username === 'admin');
+        if (admin && !verifyPassword('123', admin.password)) {
+            console.log('إصلاح كلمة مرور المدير...');
+            admin.password = hashPassword('123');
+            db.setTable('users', users);
+        }
+
+    } catch (error) {
+        console.error('خطأ في إنشاء المستخدم الافتراضي:', error);
+        // إنشاء مستخدم افتراضي جديد في حالة الخطأ
+        const defaultUsers = [{
+            id: 'admin_default',
             username: 'admin',
-            password: hashPassword('admin123'),
+            password: hashPassword('123'),
             fullName: 'المدير العام',
             role: 'admin',
             permissions: ['all'],
             isActive: true,
             createdAt: new Date().toISOString(),
             lastLogin: null
-        };
-
-        users.push(defaultAdmin);
-        db.setTable('users', users);
-        console.log('تم إنشاء المستخدم الافتراضي');
+        }];
+        db.setTable('users', defaultUsers);
+        console.log('تم إنشاء مستخدم افتراضي جديد بعد الخطأ');
     }
 }
 
@@ -52,52 +81,85 @@ function login(event) {
         event.preventDefault();
     }
 
-    const username = document.getElementById('username').value.trim();
-    const password = document.getElementById('password').value;
-    const errorDiv = document.getElementById('loginError');
+    try {
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+        const errorDiv = document.getElementById('loginError');
 
-    // إخفاء رسالة الخطأ
-    errorDiv.style.display = 'none';
+        // إخفاء رسالة الخطأ
+        errorDiv.style.display = 'none';
 
-    if (!username || !password) {
-        showLoginError('يرجى إدخال اسم المستخدم وكلمة المرور');
-        return;
+        if (!username || !password) {
+            showLoginError('يرجى إدخال اسم المستخدم وكلمة المرور');
+            return;
+        }
+
+        // محاولة تسجيل الدخول بالنظام الجديد أولاً
+        const users = db.getTable('users');
+        let user = null;
+
+        if (Array.isArray(users)) {
+            user = users.find(u => u.username === username && u.isActive);
+        }
+
+        // إذا لم يتم العثور على المستخدم، تحقق من النظام القديم
+        if (!user && username === 'admin') {
+            const settings = db.getTable('settings');
+            if (settings && db.verifyPassword(password, settings.password)) {
+                // إنشاء مستخدم مؤقت للنظام القديم
+                user = {
+                    id: 'admin_legacy',
+                    username: 'admin',
+                    fullName: 'المدير العام',
+                    role: 'admin',
+                    permissions: ['all'],
+                    isActive: true,
+                    lastLogin: new Date().toISOString()
+                };
+                console.log('تم تسجيل الدخول بالنظام القديم');
+            }
+        }
+
+        if (!user) {
+            showLoginError('اسم المستخدم أو كلمة المرور غير صحيحة');
+            return;
+        }
+
+        // التحقق من كلمة المرور للنظام الجديد
+        if (user.id !== 'admin_legacy' && !verifyPassword(password, user.password)) {
+            showLoginError('كلمة المرور غير صحيحة');
+            return;
+        }
+
+        // تحديث آخر تسجيل دخول
+        if (user.id !== 'admin_legacy') {
+            user.lastLogin = new Date().toISOString();
+            db.update('users', user.id, { lastLogin: user.lastLogin });
+        }
+
+        // حفظ المستخدم الحالي
+        currentUser = user;
+        localStorage.setItem('currentUser', JSON.stringify(user));
+
+        // إخفاء شاشة تسجيل الدخول وإظهار التطبيق
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('mainApp').classList.remove('hidden');
+
+        // تحديث اسم المستخدم في الهيدر
+        updateUserDisplay();
+
+        // تهيئة النظام
+        if (typeof initializeSystem === 'function') {
+            initializeSystem();
+        }
+
+        console.log('تم تسجيل الدخول بنجاح:', user.fullName);
+        showNotification('مرحباً ' + user.fullName, 'success');
+
+    } catch (error) {
+        console.error('خطأ في تسجيل الدخول:', error);
+        showLoginError('خطأ في النظام. يرجى المحاولة مرة أخرى');
     }
-
-    // البحث عن المستخدم
-    const users = db.getTable('users');
-    const user = users.find(u => u.username === username && u.isActive);
-
-    if (!user) {
-        showLoginError('اسم المستخدم غير موجود أو غير نشط');
-        return;
-    }
-
-    // التحقق من كلمة المرور
-    if (!verifyPassword(password, user.password)) {
-        showLoginError('كلمة المرور غير صحيحة');
-        return;
-    }
-
-    // تحديث آخر تسجيل دخول
-    user.lastLogin = new Date().toISOString();
-    db.update('users', user.id, { lastLogin: user.lastLogin });
-
-    // حفظ المستخدم الحالي
-    currentUser = user;
-    localStorage.setItem('currentUser', JSON.stringify(user));
-
-    // إخفاء شاشة تسجيل الدخول وإظهار التطبيق
-    document.getElementById('loginScreen').classList.add('hidden');
-    document.getElementById('mainApp').classList.remove('hidden');
-
-    // تحديث اسم المستخدم في الهيدر
-    updateUserDisplay();
-
-    // تهيئة النظام
-    initializeSystem();
-
-    console.log('تم تسجيل الدخول بنجاح:', user.fullName);
 }
 
 // عرض رسالة خطأ تسجيل الدخول
@@ -134,29 +196,44 @@ function logout() {
 
 // التحقق من الجلسة عند تحميل الصفحة
 function checkSession() {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-        try {
+    try {
+        const savedUser = localStorage.getItem('currentUser');
+        if (savedUser) {
             currentUser = JSON.parse(savedUser);
 
             // التحقق من أن المستخدم ما زال موجوداً ونشطاً
             const users = db.getTable('users');
-            const user = users.find(u => u.id === currentUser.id && u.isActive);
+            let userValid = false;
 
-            if (user) {
+            if (Array.isArray(users)) {
+                const user = users.find(u => u.id === currentUser.id && u.isActive);
+                userValid = !!user;
+            }
+
+            // للنظام القديم، تحقق من المستخدم المؤقت
+            if (!userValid && currentUser.id === 'admin_legacy') {
+                const settings = db.getTable('settings');
+                userValid = !!(settings && settings.password);
+            }
+
+            if (userValid) {
                 // إخفاء شاشة تسجيل الدخول وإظهار التطبيق
                 document.getElementById('loginScreen').classList.add('hidden');
                 document.getElementById('mainApp').classList.remove('hidden');
                 updateUserDisplay();
+                console.log('تم استعادة الجلسة للمستخدم:', currentUser.fullName);
                 return true;
             } else {
                 // المستخدم غير موجود أو غير نشط
+                console.log('الجلسة غير صالحة، تسجيل خروج تلقائي');
                 logout();
             }
-        } catch (error) {
-            console.error('خطأ في قراءة بيانات الجلسة:', error);
-            logout();
+        } else {
+            console.log('لا توجد جلسة محفوظة');
         }
+    } catch (error) {
+        console.error('خطأ في قراءة بيانات الجلسة:', error);
+        logout();
     }
     return false;
 }
@@ -616,10 +693,16 @@ function loadProductsSection() {
     section.innerHTML = `
         <div class="section-header">
             <h2><i class="fas fa-box"></i> إدارة المنتجات</h2>
-            <button class="btn btn-primary" onclick="showAddProductModal()">
-                <i class="fas fa-plus"></i>
-                إضافة منتج جديد
-            </button>
+            <div class="section-actions">
+                <button class="btn btn-primary" onclick="showAddProductModal()">
+                    <i class="fas fa-plus"></i>
+                    إضافة منتج جديد
+                </button>
+                <button class="btn btn-secondary" onclick="completeProductData()" title="إكمال البيانات الناقصة للمنتجات">
+                    <i class="fas fa-database"></i>
+                    إكمال البيانات
+                </button>
+            </div>
         </div>
         
         <div class="filters-container">
@@ -650,7 +733,11 @@ function loadProductsSection() {
     `;
     
     loadProducts();
-    loadCategories();
+
+    // تأخير تحميل الفئات للتأكد من جاهزية DOM
+    setTimeout(() => {
+        loadCategories();
+    }, 100);
 }
 
 // مسح فلاتر المنتجات
@@ -682,45 +769,68 @@ function loadProducts() {
             return;
         }
         
-        grid.innerHTML = products.map(product => `
-            <div class="product-card" data-category="${product.category || 'general'}">
-                <img class="product-image" src="${getProductImage(product)}" alt="${product.name}" loading="lazy">
+        grid.innerHTML = products.map(product => {
+            // حساب إجمالي الكمية عبر جميع المخازن
+            const totalQuantity = Object.values(product.warehouses || {}).reduce((sum, qty) => sum + qty, 0);
+            const displayQuantity = totalQuantity || product.quantity || 0;
 
-                <div class="product-header">
-                    <h3>${product.name}</h3>
-                    <div class="product-actions">
-                        <button class="btn-icon btn-info" onclick="showProductStockStatus('${product.id}')" title="حالة المخزون">
-                            <i class="fas fa-warehouse"></i>
-                        </button>
-                        <button class="btn-icon" onclick="editProduct('${product.id}')" title="تعديل">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn-icon btn-danger" onclick="deleteProduct('${product.id}')" title="حذف">
-                            <i class="fas fa-trash"></i>
-                        </button>
+            // الحصول على معلومات المورد
+            const suppliers = db.getTable('suppliers');
+            const supplier = suppliers.find(s => s.id === product.supplierId);
+            const supplierName = supplier ? supplier.name : 'غير محدد';
+
+            return `
+                <div class="product-card" data-category="${product.category || 'general'}">
+                    <img class="product-image" src="${getProductImage(product)}" alt="${product.name}" loading="lazy">
+
+                    <div class="product-header">
+                        <h3>${product.name}</h3>
+                        <div class="product-actions">
+                            <button class="btn-icon btn-info" onclick="showProductStockStatus('${product.id}')" title="حالة المخزون">
+                                <i class="fas fa-warehouse"></i>
+                            </button>
+                            <button class="btn-icon" onclick="editProduct('${product.id}')" title="تعديل">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn-icon btn-danger" onclick="deleteProduct('${product.id}')" title="حذف">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
                     </div>
+
+                    <div class="product-supplier">
+                        <i class="fas fa-truck"></i>
+                        <span>المورد: ${supplierName}</span>
+                    </div>
+
+                    <div class="product-info">
+                        <div class="product-price">
+                            <span class="label">السعر:</span>
+                            <span class="value">${formatCurrency(product.salePrice || product.price || 0)}</span>
+                        </div>
+
+                        <div class="product-quantity ${displayQuantity <= (product.minQuantity || 5) ? 'low-stock' : ''}">
+                            <span class="label">إجمالي الكمية:</span>
+                            <span class="value">${db.toArabicNumbers(displayQuantity)}</span>
+                        </div>
+
+                        <div class="product-category">
+                            <span class="label">الفئة:</span>
+                            <span class="value">${getCategoryName(product.category)}</span>
+                        </div>
+
+                        ${product.purchasePrice ? `
+                            <div class="product-profit">
+                                <span class="label">الربح:</span>
+                                <span class="value">${formatCurrency((product.salePrice || product.price || 0) - product.purchasePrice)}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    ${product.description ? `<div class="product-description">${product.description}</div>` : ''}
                 </div>
-
-                <div class="product-info">
-                    <div class="product-price">
-                        <span class="label">السعر:</span>
-                        <span class="value">${formatCurrency(product.price)}</span>
-                    </div>
-
-                    <div class="product-quantity ${product.quantity <= (product.minQuantity || 5) ? 'low-stock' : ''}">
-                        <span class="label">الكمية:</span>
-                        <span class="value">${db.toArabicNumbers(product.quantity)}</span>
-                    </div>
-
-                    <div class="product-category">
-                        <span class="label">الفئة:</span>
-                        <span class="value">${getCategoryName(product.category)}</span>
-                    </div>
-                </div>
-
-                ${product.description ? `<div class="product-description">${product.description}</div>` : ''}
-            </div>
-        `).join('');
+            `;
+        }).join('');
         
     } catch (error) {
         console.error('خطأ في تحميل المنتجات:', error);
@@ -732,15 +842,32 @@ function loadProducts() {
 function loadCategories() {
     try {
         const categories = db.getTable('categories');
-        const filter = document.getElementById('categoryFilter');
-        
-        if (!filter) return;
-        
-        filter.innerHTML = '<option value="">جميع الفئات</option>' +
-            categories.map(category => 
-                `<option value="${category.id}">${category.name}</option>`
-            ).join('');
-            
+
+        if (categories.length === 0) {
+            console.log('لا توجد فئات في قاعدة البيانات');
+            return;
+        }
+
+        // تحميل الفئات في جميع القوائم المنسدلة للفئات
+        const categorySelectors = [
+            'categoryFilter',           // فلتر المنتجات
+            'inventoryCategoryFilter',  // فلتر المخزون
+            'warehouseCategoryFilter'   // فلتر المخازن
+        ];
+
+        categorySelectors.forEach(selectorId => {
+            const filter = document.getElementById(selectorId);
+            if (filter) {
+                filter.innerHTML = '<option value="">جميع الفئات</option>' +
+                    categories.map(category =>
+                        `<option value="${category.id}">${category.name}</option>`
+                    ).join('');
+                console.log(`تم تحميل الفئات في ${selectorId}`);
+            }
+        });
+
+        console.log(`تم تحميل ${categories.length} فئة بنجاح`);
+
     } catch (error) {
         console.error('خطأ في تحميل الفئات:', error);
     }
@@ -801,13 +928,35 @@ function showAddProductModal() {
                 </div>
 
                 <div class="form-group">
-                    <label for="productPrice">السعر *</label>
-                    <input type="number" id="productPrice" step="0.01" min="0" required>
+                    <label for="productSalePrice">سعر البيع *</label>
+                    <input type="number" id="productSalePrice" step="0.001" min="0" required onchange="calculateProfit()">
                 </div>
 
                 <div class="form-group">
-                    <label for="productQuantity">الكمية *</label>
-                    <input type="number" id="productQuantity" min="0" required>
+                    <label for="productPurchasePrice">سعر الشراء *</label>
+                    <input type="number" id="productPurchasePrice" step="0.001" min="0" required onchange="calculateProfit()">
+                </div>
+
+                <div class="form-group">
+                    <label for="productProfit">الربح</label>
+                    <input type="number" id="productProfit" step="0.001" readonly>
+                </div>
+
+                <div class="form-group">
+                    <label for="productProfitPercentage">نسبة الربح %</label>
+                    <input type="number" id="productProfitPercentage" step="0.01" readonly>
+                </div>
+
+                <div class="form-group">
+                    <label for="productQuantity">إجمالي الكمية</label>
+                    <input type="number" id="productQuantity" min="0" readonly>
+                </div>
+
+                <div class="form-group">
+                    <label>توزيع الكمية على المخازن</label>
+                    <div id="warehouseDistribution" class="warehouse-distribution">
+                        <!-- سيتم تحميل المخازن هنا -->
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -826,11 +975,11 @@ function showAddProductModal() {
                 </div>
 
                 <div class="form-group">
-                    <label for="productSupplier">المورد</label>
-                    <select id="productSupplier">
+                    <label for="productSupplier">المورد *</label>
+                    <select id="productSupplier" required>
                         <option value="">اختر مورد</option>
-                        ${suppliers.map(supplier =>
-                            `<option value="${supplier.id}">${supplier.name}</option>`
+                        ${suppliers.map((supplier, index) =>
+                            `<option value="${supplier.id}">${index + 1}. ${supplier.name}</option>`
                         ).join('')}
                     </select>
                 </div>
@@ -855,7 +1004,7 @@ function showAddProductModal() {
             <div class="form-group">
                 <label for="productImage">صورة المنتج</label>
                 <div class="image-upload-container">
-                    <div class="image-preview">
+                    <div class="image-preview" onclick="document.getElementById('productImage').click()">
                         <img id="productImagePreview" src="${DEFAULT_PRODUCT_IMAGE}" alt="معاينة الصورة">
                         <div class="image-overlay">
                             <i class="fas fa-camera"></i>
@@ -882,6 +1031,9 @@ function showAddProductModal() {
     `;
 
     showModal('إضافة منتج جديد', content);
+
+    // تحميل توزيع المخازن
+    loadWarehouseDistribution();
 }
 
 // توليد باركود تلقائي
@@ -897,6 +1049,195 @@ function generateBarcode() {
     }
 }
 
+// حساب الربح ونسبة الربح
+function calculateProfit() {
+    const salePriceInput = document.getElementById('productSalePrice');
+    const purchasePriceInput = document.getElementById('productPurchasePrice');
+    const profitInput = document.getElementById('productProfit');
+    const profitPercentageInput = document.getElementById('productProfitPercentage');
+
+    if (salePriceInput && purchasePriceInput && profitInput && profitPercentageInput) {
+        const salePrice = parseFloat(salePriceInput.value) || 0;
+        const purchasePrice = parseFloat(purchasePriceInput.value) || 0;
+
+        const profit = salePrice - purchasePrice;
+        const profitPercentage = purchasePrice > 0 ? (profit / purchasePrice) * 100 : 0;
+
+        profitInput.value = profit.toFixed(3);
+        profitPercentageInput.value = profitPercentage.toFixed(2);
+    }
+}
+
+// تحميل توزيع المخازن
+function loadWarehouseDistribution(productWarehouses = {}) {
+    const warehouses = db.getTable('warehouses').filter(w => w.isActive);
+    const container = document.getElementById('warehouseDistribution');
+
+    if (!container) return;
+
+    // الحصول على الحد الأدنى للكمية من النموذج
+    const getMinQuantity = () => {
+        const minQtyInput = document.getElementById('productMinQuantity');
+        return minQtyInput ? parseInt(minQtyInput.value) || 5 : 5;
+    };
+
+    container.innerHTML = warehouses.map(warehouse => {
+        const currentQty = productWarehouses[warehouse.id] || 0;
+        const minQuantity = getMinQuantity();
+        const isLowStock = currentQty <= minQuantity;
+
+        return `
+            <div class="warehouse-qty-item ${isLowStock ? 'low-stock' : ''}">
+                <label for="warehouse_${warehouse.id}">${warehouse.name}:</label>
+                <div class="warehouse-qty-display">
+                    <input type="number"
+                           id="warehouse_${warehouse.id}"
+                           class="warehouse-qty-input"
+                           min="0"
+                           value="${currentQty}"
+                           readonly
+                           title="هذا الحقل للعرض فقط - يتم إدارة المخزون من قسم المخازن">
+                    ${isLowStock ? '<span class="low-stock-indicator">مخزون منخفض</span>' : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // حساب الكمية الإجمالية
+    calculateTotalQuantity();
+
+    // إضافة مستمع للتغييرات في الحد الأدنى للكمية لتحديث المؤشرات
+    const minQtyInput = document.getElementById('productMinQuantity');
+    if (minQtyInput) {
+        minQtyInput.addEventListener('input', () => {
+            loadWarehouseDistribution(productWarehouses);
+        });
+    }
+}
+
+// إكمال بيانات المنتجات الناقصة
+function completeProductData() {
+    try {
+        const products = db.getTable('products');
+        const suppliers = db.getTable('suppliers');
+        const purchases = db.getTable('purchases');
+
+        if (products.length === 0 || suppliers.length === 0) {
+            console.log('لا توجد منتجات أو موردين لإكمال البيانات');
+            return;
+        }
+
+        let updatedCount = 0;
+
+        products.forEach(product => {
+            let needsUpdate = false;
+            const updates = { ...product };
+
+            // إضافة سعر الشراء إذا لم يكن موجوداً
+            if (!product.purchasePrice) {
+                // حساب سعر الشراء كنسبة من سعر البيع (70-85%)
+                const salePrice = product.salePrice || product.price || 0;
+                const purchasePrice = salePrice * (0.70 + Math.random() * 0.15);
+                updates.purchasePrice = Math.round(purchasePrice * 1000) / 1000; // تقريب لـ 3 خانات عشرية
+                needsUpdate = true;
+            }
+
+            // إضافة salePrice إذا لم يكن موجوداً
+            if (!product.salePrice && product.price) {
+                updates.salePrice = product.price;
+                needsUpdate = true;
+            }
+
+            // حساب الربح ونسبة الربح
+            if (updates.salePrice && updates.purchasePrice) {
+                const profit = updates.salePrice - updates.purchasePrice;
+                const profitPercentage = updates.purchasePrice > 0 ? (profit / updates.purchasePrice) * 100 : 0;
+                updates.profit = Math.round(profit * 1000) / 1000;
+                updates.profitPercentage = Math.round(profitPercentage * 100) / 100;
+                needsUpdate = true;
+            }
+
+            // تعيين مورد بناءً على الفئة أو فواتير الشراء
+            if (!product.supplierId) {
+                let assignedSupplier = null;
+
+                // البحث في فواتير الشراء أولاً
+                const productPurchases = purchases.filter(purchase =>
+                    purchase.items && purchase.items.some(item => item.productId === product.id)
+                );
+
+                if (productPurchases.length > 0) {
+                    // استخدام المورد من آخر فاتورة شراء
+                    const latestPurchase = productPurchases.sort((a, b) =>
+                        new Date(b.createdAt) - new Date(a.createdAt)
+                    )[0];
+                    assignedSupplier = suppliers.find(s => s.id === latestPurchase.supplierId);
+                } else {
+                    // تعيين مورد بناءً على الفئة
+                    switch (product.category) {
+                        case 'electronics':
+                            assignedSupplier = suppliers.find(s => s.name.includes('إلكترونيات') || s.name.includes('الخليج'));
+                            break;
+                        case 'clothing':
+                            assignedSupplier = suppliers.find(s => s.name.includes('ملابس') || s.name.includes('النور'));
+                            break;
+                        case 'food':
+                            assignedSupplier = suppliers.find(s => s.name.includes('غذائية') || s.name.includes('الكويت'));
+                            break;
+                        default:
+                            // تعيين مورد عشوائي للفئات الأخرى
+                            assignedSupplier = suppliers[Math.floor(Math.random() * suppliers.length)];
+                    }
+                }
+
+                if (assignedSupplier) {
+                    updates.supplierId = assignedSupplier.id;
+                    needsUpdate = true;
+                }
+            }
+
+            // تحديث المنتج إذا كان هناك تغييرات
+            if (needsUpdate) {
+                const success = db.update('products', product.id, updates);
+                if (success) {
+                    updatedCount++;
+                }
+            }
+        });
+
+        if (updatedCount > 0) {
+            console.log(`تم إكمال بيانات ${updatedCount} منتج بنجاح`);
+            showNotification(`تم إكمال بيانات ${updatedCount} منتج بنجاح`, 'success');
+
+            // إعادة تحميل المنتجات
+            if (typeof loadProducts === 'function') {
+                loadProducts();
+            }
+        } else {
+            console.log('جميع المنتجات تحتوي على بيانات كاملة');
+        }
+
+    } catch (error) {
+        console.error('خطأ في إكمال بيانات المنتجات:', error);
+        showNotification('خطأ في إكمال بيانات المنتجات', 'error');
+    }
+}
+
+// حساب إجمالي الكمية
+function calculateTotalQuantity() {
+    const warehouseInputs = document.querySelectorAll('.warehouse-qty-input');
+    const totalQuantityInput = document.getElementById('productQuantity');
+
+    if (!totalQuantityInput) return;
+
+    let total = 0;
+    warehouseInputs.forEach(input => {
+        total += parseInt(input.value) || 0;
+    });
+
+    totalQuantityInput.value = total;
+}
+
 // حفظ المنتج
 function saveProduct(event) {
     event.preventDefault();
@@ -907,10 +1248,25 @@ function saveProduct(event) {
         const productImage = imagePreview && imagePreview.dataset.compressed ?
             imagePreview.dataset.compressed : DEFAULT_PRODUCT_IMAGE;
 
+        // جمع توزيع المخازن
+        const warehouses = db.getTable('warehouses').filter(w => w.isActive);
+        const warehouseDistribution = {};
+        warehouses.forEach(warehouse => {
+            const qtyInput = document.getElementById(`warehouse_${warehouse.id}`);
+            if (qtyInput) {
+                warehouseDistribution[warehouse.id] = parseInt(qtyInput.value) || 0;
+            }
+        });
+
         const formData = {
             name: document.getElementById('productName').value.trim(),
-            price: parseFloat(document.getElementById('productPrice').value),
+            price: parseFloat(document.getElementById('productSalePrice').value), // Keep for backward compatibility
+            salePrice: parseFloat(document.getElementById('productSalePrice').value),
+            purchasePrice: parseFloat(document.getElementById('productPurchasePrice').value),
+            profit: parseFloat(document.getElementById('productProfit').value),
+            profitPercentage: parseFloat(document.getElementById('productProfitPercentage').value),
             quantity: parseInt(document.getElementById('productQuantity').value),
+            warehouses: warehouseDistribution,
             minQuantity: parseInt(document.getElementById('productMinQuantity').value) || 5,
             category: document.getElementById('productCategory').value,
             supplierId: document.getElementById('productSupplier').value,
@@ -925,13 +1281,23 @@ function saveProduct(event) {
             return;
         }
         
-        if (formData.price <= 0) {
-            showNotification('يرجى إدخال سعر صحيح', 'error');
+        if (formData.salePrice <= 0) {
+            showNotification('يرجى إدخال سعر بيع صحيح', 'error');
+            return;
+        }
+
+        if (formData.purchasePrice <= 0) {
+            showNotification('يرجى إدخال سعر شراء صحيح', 'error');
             return;
         }
         
         if (formData.quantity < 0) {
             showNotification('يرجى إدخال كمية صحيحة', 'error');
+            return;
+        }
+
+        if (!formData.supplierId) {
+            showNotification('يرجى اختيار المورد', 'error');
             return;
         }
         
@@ -983,13 +1349,35 @@ function editProduct(productId) {
                 </div>
                 
                 <div class="form-group">
-                    <label for="productPrice">السعر *</label>
-                    <input type="number" id="productPrice" step="0.01" min="0" value="${product.price}" required>
+                    <label for="productSalePrice">سعر البيع *</label>
+                    <input type="number" id="productSalePrice" step="0.001" min="0" value="${product.salePrice || product.price || 0}" required onchange="calculateProfit()">
+                </div>
+
+                <div class="form-group">
+                    <label for="productPurchasePrice">سعر الشراء *</label>
+                    <input type="number" id="productPurchasePrice" step="0.001" min="0" value="${product.purchasePrice || 0}" required onchange="calculateProfit()">
+                </div>
+
+                <div class="form-group">
+                    <label for="productProfit">الربح</label>
+                    <input type="number" id="productProfit" step="0.001" value="${product.profit || 0}" readonly>
+                </div>
+
+                <div class="form-group">
+                    <label for="productProfitPercentage">نسبة الربح %</label>
+                    <input type="number" id="productProfitPercentage" step="0.01" value="${product.profitPercentage || 0}" readonly>
                 </div>
                 
                 <div class="form-group">
-                    <label for="productQuantity">الكمية *</label>
-                    <input type="number" id="productQuantity" min="0" value="${product.quantity}" required>
+                    <label for="productQuantity">إجمالي الكمية</label>
+                    <input type="number" id="productQuantity" min="0" value="${Object.values(product.warehouses || {}).reduce((sum, qty) => sum + qty, 0)}" readonly>
+                </div>
+
+                <div class="form-group">
+                    <label>توزيع الكمية على المخازن</label>
+                    <div id="warehouseDistribution" class="warehouse-distribution">
+                        <!-- سيتم تحميل المخازن هنا -->
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -1011,8 +1399,8 @@ function editProduct(productId) {
                     <label for="productSupplier">المورد</label>
                     <select id="productSupplier">
                         <option value="">اختر مورد</option>
-                        ${suppliers.map(supplier =>
-                            `<option value="${supplier.id}" ${supplier.id === product.supplierId ? 'selected' : ''}>${supplier.name}</option>`
+                        ${suppliers.map((supplier, index) =>
+                            `<option value="${supplier.id}" ${supplier.id === product.supplierId ? 'selected' : ''}>${index + 1}. ${supplier.name}</option>`
                         ).join('')}
                     </select>
                 </div>
@@ -1037,7 +1425,7 @@ function editProduct(productId) {
             <div class="form-group">
                 <label for="productImageEdit">صورة المنتج</label>
                 <div class="image-upload-container">
-                    <div class="image-preview">
+                    <div class="image-preview" onclick="document.getElementById('productImageEdit').click()">
                         <img id="productImagePreviewEdit" src="${getProductImage(product)}" alt="معاينة الصورة">
                         <div class="image-overlay">
                             <i class="fas fa-camera"></i>
@@ -1064,6 +1452,9 @@ function editProduct(productId) {
     `;
     
     showModal('تعديل المنتج', content);
+
+    // تحميل توزيع المخازن مع البيانات الحالية
+    loadWarehouseDistribution(product.warehouses || {});
 }
 
 // عرض حالة المخزون للمنتج
@@ -1190,10 +1581,25 @@ function updateProduct(event, productId) {
             productImage = imagePreviewEdit.dataset.compressed;
         }
 
+        // جمع توزيع المخازن
+        const warehouses = db.getTable('warehouses').filter(w => w.isActive);
+        const warehouseDistribution = {};
+        warehouses.forEach(warehouse => {
+            const qtyInput = document.getElementById(`warehouse_${warehouse.id}`);
+            if (qtyInput) {
+                warehouseDistribution[warehouse.id] = parseInt(qtyInput.value) || 0;
+            }
+        });
+
         const updates = {
             name: document.getElementById('productName').value.trim(),
-            price: parseFloat(document.getElementById('productPrice').value),
+            price: parseFloat(document.getElementById('productSalePrice').value), // Keep for backward compatibility
+            salePrice: parseFloat(document.getElementById('productSalePrice').value),
+            purchasePrice: parseFloat(document.getElementById('productPurchasePrice').value),
+            profit: parseFloat(document.getElementById('productProfit').value),
+            profitPercentage: parseFloat(document.getElementById('productProfitPercentage').value),
             quantity: parseInt(document.getElementById('productQuantity').value),
+            warehouses: warehouseDistribution,
             minQuantity: parseInt(document.getElementById('productMinQuantity').value) || 5,
             category: document.getElementById('productCategory').value,
             supplierId: document.getElementById('productSupplier').value,
@@ -1208,8 +1614,13 @@ function updateProduct(event, productId) {
             return;
         }
         
-        if (updates.price <= 0) {
-            showNotification('يرجى إدخال سعر صحيح', 'error');
+        if (updates.salePrice <= 0) {
+            showNotification('يرجى إدخال سعر بيع صحيح', 'error');
+            return;
+        }
+
+        if (updates.purchasePrice <= 0) {
+            showNotification('يرجى إدخال سعر شراء صحيح', 'error');
             return;
         }
         
@@ -1291,12 +1702,20 @@ function loadSalesSection() {
 
         <!-- تبويب نقطة البيع -->
         <div id="posTab" class="sales-tab active">
-            <div class="sales-info">
-                <div class="customer-selection">
-                    <label for="customerSelect">العميل:</label>
-                    <select id="customerSelect" onchange="updateCustomerInfo()"></select>
+            <div class="filters-container">
+                <div class="filter-group">
+                    <label class="filter-label" for="customerSelect">العميل</label>
+                    <select id="customerSelect" class="filter-select" onchange="updateCustomerInfo()"></select>
                 </div>
-                <div id="customerBalance" class="customer-balance-display"></div>
+                <div class="filter-group">
+                    <label class="filter-label" for="warehouseSelect">المخزن</label>
+                    <select id="warehouseSelect" class="filter-select" onchange="updateWarehouseProducts()">
+                        <option value="">جميع المخازن</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <div id="customerBalance" class="customer-balance-display"></div>
+                </div>
             </div>
 
         <div class="new-sales-layout">
@@ -1438,6 +1857,7 @@ function loadSalesSection() {
 
     loadProductsDropdown();
     loadCustomers();
+    loadWarehouses();
     updateTaxRate();
     loadInvoicesHistory();
 }
@@ -1536,7 +1956,7 @@ function loadInvoicesHistory() {
                     </div>
 
                     <div class="invoice-actions">
-                        <button class="btn btn-sm btn-primary" onclick="viewInvoiceDetails('${sale.id}')" title="عرض التفاصيل">
+                        <button class="btn btn-sm btn-primary" onclick="viewInvoiceDetails('${sale.id}', 'sale')" title="عرض التفاصيل">
                             <i class="fas fa-eye"></i>
                             مشاهدة
                         </button>
@@ -1548,7 +1968,7 @@ function loadInvoicesHistory() {
                             <i class="fas fa-trash"></i>
                             حذف
                         </button>
-                        <button class="btn btn-sm btn-info" onclick="printInvoice('${sale.id}')" title="طباعة">
+                        <button class="btn btn-sm btn-info" onclick="printInvoiceById('${sale.id}')" title="طباعة">
                             <i class="fas fa-print"></i>
                             طباعة
                         </button>
@@ -1674,7 +2094,7 @@ function displayFilteredInvoices(sales) {
                 </div>
 
                 <div class="invoice-actions">
-                    <button class="btn btn-sm btn-primary" onclick="viewInvoiceDetails('${sale.id}')" title="عرض التفاصيل">
+                    <button class="btn btn-sm btn-primary" onclick="viewInvoiceDetails('${sale.id}', 'sale')" title="عرض التفاصيل">
                         <i class="fas fa-eye"></i>
                         مشاهدة
                     </button>
@@ -1686,7 +2106,7 @@ function displayFilteredInvoices(sales) {
                         <i class="fas fa-trash"></i>
                         حذف
                     </button>
-                    <button class="btn btn-sm btn-info" onclick="printInvoice('${sale.id}')" title="طباعة">
+                    <button class="btn btn-sm btn-info" onclick="printInvoiceById('${sale.id}')" title="طباعة">
                         <i class="fas fa-print"></i>
                         طباعة
                     </button>
@@ -1794,6 +2214,298 @@ function viewInvoiceDetails(saleId) {
     showModal('تفاصيل الفاتورة', content);
 }
 
+// تعديل فاتورة
+function editInvoice(saleId) {
+    const sale = db.findById('sales', saleId);
+    if (!sale) {
+        showNotification('الفاتورة غير موجودة', 'error');
+        return;
+    }
+
+    const customers = db.getTable('customers');
+    const products = db.getTable('products');
+
+    const content = `
+        <form id="editInvoiceForm" onsubmit="updateInvoice(event, '${saleId}')">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="editCustomer">العميل *</label>
+                    <select id="editCustomer" required>
+                        <option value="guest" ${sale.customerId === 'guest' ? 'selected' : ''}>ضيف</option>
+                        ${customers.filter(c => c.id !== 'guest').map(customer => `
+                            <option value="${customer.id}" ${sale.customerId === customer.id ? 'selected' : ''}>
+                                ${customer.name}
+                            </option>
+                        `).join('')}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="editPaymentMethod">طريقة الدفع *</label>
+                    <select id="editPaymentMethod" required>
+                        <option value="cash" ${sale.paymentMethod === 'cash' ? 'selected' : ''}>نقداً</option>
+                        <option value="credit" ${sale.paymentMethod === 'credit' ? 'selected' : ''}>على الحساب</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>الأصناف</label>
+                <div id="editInvoiceItems">
+                    ${sale.items.map((item, index) => `
+                        <div class="item-row" data-index="${index}">
+                            <select class="item-product" onchange="updateEditItemPrice(${index})">
+                                <option value="">اختر منتج</option>
+                                ${products.map(product => `
+                                    <option value="${product.id}" data-price="${product.salePrice || product.price || 0}" ${item.productId === product.id ? 'selected' : ''}>
+                                        ${product.name}
+                                    </option>
+                                `).join('')}
+                            </select>
+                            <input type="number" class="item-quantity" value="${item.quantity}" min="1" onchange="updateEditItemTotal(${index})">
+                            <input type="number" class="item-price" value="${item.price}" step="0.001" min="0" onchange="updateEditItemTotal(${index})">
+                            <input type="number" class="item-total" value="${item.total}" readonly>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="removeEditItem(${index})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+                <button type="button" class="btn btn-secondary" onclick="addEditItem()">
+                    <i class="fas fa-plus"></i>
+                    إضافة صنف
+                </button>
+            </div>
+
+            <div class="invoice-totals">
+                <div class="total-row">
+                    <span>المجموع الفرعي:</span>
+                    <span id="editSubtotal">${formatCurrency(sale.subtotal)}</span>
+                </div>
+                <div class="total-row">
+                    <span>الضريبة:</span>
+                    <span id="editTax">${formatCurrency(sale.taxAmount || 0)}</span>
+                </div>
+                <div class="total-row">
+                    <span>الخصم:</span>
+                    <span id="editDiscount">${formatCurrency(sale.discountAmount || 0)}</span>
+                </div>
+                <div class="total-row total">
+                    <span>المجموع الكلي:</span>
+                    <span id="editTotal">${formatCurrency(sale.total)}</span>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i>
+                    حفظ التعديلات
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">
+                    إلغاء
+                </button>
+            </div>
+        </form>
+    `;
+
+    showModal('تعديل الفاتورة', content);
+}
+
+// تحديث سعر الصنف في تعديل الفاتورة
+function updateEditItemPrice(index) {
+    const row = document.querySelector(`[data-index="${index}"]`);
+    const productSelect = row.querySelector('.item-product');
+    const priceInput = row.querySelector('.item-price');
+
+    const selectedOption = productSelect.options[productSelect.selectedIndex];
+    if (selectedOption && selectedOption.dataset.price) {
+        priceInput.value = selectedOption.dataset.price;
+        updateEditItemTotal(index);
+    }
+}
+
+// تحديث إجمالي الصنف في تعديل الفاتورة
+function updateEditItemTotal(index) {
+    const row = document.querySelector(`[data-index="${index}"]`);
+    const quantity = parseFloat(row.querySelector('.item-quantity').value) || 0;
+    const price = parseFloat(row.querySelector('.item-price').value) || 0;
+    const total = quantity * price;
+
+    row.querySelector('.item-total').value = total.toFixed(3);
+    updateEditInvoiceTotals();
+}
+
+// إضافة صنف جديد في تعديل الفاتورة
+function addEditItem() {
+    const container = document.getElementById('editInvoiceItems');
+    const products = db.getTable('products');
+    const index = container.children.length;
+
+    const itemRow = document.createElement('div');
+    itemRow.className = 'item-row';
+    itemRow.setAttribute('data-index', index);
+
+    itemRow.innerHTML = `
+        <select class="item-product" onchange="updateEditItemPrice(${index})">
+            <option value="">اختر منتج</option>
+            ${products.map(product => `
+                <option value="${product.id}" data-price="${product.salePrice || product.price || 0}">
+                    ${product.name}
+                </option>
+            `).join('')}
+        </select>
+        <input type="number" class="item-quantity" value="1" min="1" onchange="updateEditItemTotal(${index})">
+        <input type="number" class="item-price" value="0" step="0.001" min="0" onchange="updateEditItemTotal(${index})">
+        <input type="number" class="item-total" value="0" readonly>
+        <button type="button" class="btn btn-danger btn-sm" onclick="removeEditItem(${index})">
+            <i class="fas fa-trash"></i>
+        </button>
+    `;
+
+    container.appendChild(itemRow);
+}
+
+// حذف صنف من تعديل الفاتورة
+function removeEditItem(index) {
+    const row = document.querySelector(`[data-index="${index}"]`);
+    if (row) {
+        row.remove();
+        updateEditInvoiceTotals();
+    }
+}
+
+// تحديث مجاميع تعديل الفاتورة
+function updateEditInvoiceTotals() {
+    const rows = document.querySelectorAll('#editInvoiceItems .item-row');
+    let subtotal = 0;
+
+    rows.forEach(row => {
+        const total = parseFloat(row.querySelector('.item-total').value) || 0;
+        subtotal += total;
+    });
+
+    const settings = db.getTable('settings');
+    const taxRate = settings.taxRate ?? 0;
+    const taxAmount = subtotal * (taxRate / 100);
+    const total = subtotal + taxAmount;
+
+    document.getElementById('editSubtotal').textContent = formatCurrency(subtotal);
+    document.getElementById('editTax').textContent = formatCurrency(taxAmount);
+    document.getElementById('editTotal').textContent = formatCurrency(total);
+}
+
+// حفظ تعديلات الفاتورة
+function updateInvoice(event, saleId) {
+    event.preventDefault();
+
+    try {
+        const sale = db.findById('sales', saleId);
+        if (!sale) {
+            showNotification('الفاتورة غير موجودة', 'error');
+            return;
+        }
+
+        const customerId = document.getElementById('editCustomer').value;
+        const paymentMethod = document.getElementById('editPaymentMethod').value;
+
+        // جمع الأصناف
+        const rows = document.querySelectorAll('#editInvoiceItems .item-row');
+        const items = [];
+
+        rows.forEach(row => {
+            const productSelect = row.querySelector('.item-product');
+            const quantity = parseInt(row.querySelector('.item-quantity').value);
+            const price = parseFloat(row.querySelector('.item-price').value);
+            const total = parseFloat(row.querySelector('.item-total').value);
+
+            if (productSelect.value && quantity > 0 && price > 0) {
+                const product = db.findById('products', productSelect.value);
+                items.push({
+                    productId: productSelect.value,
+                    name: product ? product.name : '',
+                    quantity: quantity,
+                    price: price,
+                    total: total
+                });
+            }
+        });
+
+        if (items.length === 0) {
+            showNotification('يجب إضافة أصناف للفاتورة', 'error');
+            return;
+        }
+
+        // حساب المجاميع
+        const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+        const settings = db.getTable('settings');
+        const taxRate = settings.taxRate ?? 0;
+        const taxAmount = subtotal * (taxRate / 100);
+        const total = subtotal + taxAmount;
+
+        // استرداد الكميات القديمة
+        sale.items.forEach(item => {
+            const product = db.findById('products', item.productId);
+            if (product) {
+                db.update('products', item.productId, {
+                    quantity: product.quantity + item.quantity
+                });
+            }
+        });
+
+        // تحديث الفاتورة
+        const updatedSale = {
+            ...sale,
+            customerId: customerId,
+            paymentMethod: paymentMethod,
+            items: items,
+            subtotal: subtotal,
+            taxAmount: taxAmount,
+            total: total
+        };
+
+        const success = db.update('sales', saleId, updatedSale);
+
+        if (success) {
+            // خصم الكميات الجديدة
+            items.forEach(item => {
+                const product = db.findById('products', item.productId);
+                if (product) {
+                    db.update('products', item.productId, {
+                        quantity: product.quantity - item.quantity
+                    });
+                }
+            });
+
+            // تحديث رصيد العميل
+            const oldCustomer = db.findById('customers', sale.customerId);
+            const newCustomer = db.findById('customers', customerId);
+
+            if (oldCustomer && sale.paymentMethod === 'credit') {
+                db.update('customers', sale.customerId, {
+                    balance: oldCustomer.balance + sale.total
+                });
+            }
+
+            if (newCustomer && paymentMethod === 'credit') {
+                db.update('customers', customerId, {
+                    balance: newCustomer.balance - total
+                });
+            }
+
+            showNotification('تم تحديث الفاتورة بنجاح', 'success');
+            closeModal();
+            loadInvoicesHistory();
+            updateDashboard();
+        } else {
+            showNotification('خطأ في تحديث الفاتورة', 'error');
+        }
+
+    } catch (error) {
+        console.error('خطأ في تحديث الفاتورة:', error);
+        showNotification('خطأ في تحديث الفاتورة', 'error');
+    }
+}
+
 // حذف فاتورة
 function deleteInvoice(saleId) {
     if (!confirmDelete('هل أنت متأكد من حذف هذه الفاتورة؟\nسيتم استرداد الكميات إلى المخزون.')) {
@@ -1844,7 +2556,7 @@ function deleteInvoice(saleId) {
 }
 
 // تحميل المنتجات في القائمة المنسدلة
-function loadProductsDropdown() {
+function loadProductsDropdown(selectedWarehouse = '') {
     try {
         const products = db.getTable('products');
         const productDropdown = document.getElementById('productDropdown');
@@ -1858,17 +2570,43 @@ function loadProductsDropdown() {
             return;
         }
 
-        // ترتيب المنتجات حسب الاسم وإظهار المتوفرة فقط
-        const availableProducts = products.filter(product => product.quantity > 0);
+        // فلترة المنتجات حسب المخزن المحدد
+        let availableProducts;
+        if (selectedWarehouse) {
+            availableProducts = products.filter(product => {
+                const warehouseQty = product.warehouses?.[selectedWarehouse] || 0;
+                return warehouseQty > 0;
+            });
+        } else {
+            // إظهار المنتجات التي لها كمية في أي مخزن
+            availableProducts = products.filter(product => {
+                const totalQty = Object.values(product.warehouses || {}).reduce((sum, qty) => sum + qty, 0);
+                return totalQty > 0;
+            });
+        }
+
         const sortedProducts = availableProducts.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
 
         productDropdown.innerHTML = `
             <option value="">-- اختر منتج --</option>
-            ${sortedProducts.map(product => `
-                <option value="${product.id}" data-price="${product.price}" data-stock="${product.quantity}">
-                    ${product.name} - ${formatCurrency(product.price)} - مخزون: ${db.toArabicNumbers(product.quantity)}
-                </option>
-            `).join('')}
+            ${sortedProducts.map((product, index) => {
+                let stockInfo;
+                if (selectedWarehouse) {
+                    const warehouseQty = product.warehouses?.[selectedWarehouse] || 0;
+                    const totalQty = Object.values(product.warehouses || {}).reduce((sum, qty) => sum + qty, 0);
+                    stockInfo = `مخزون: ${db.toArabicNumbers(warehouseQty)} (إجمالي: ${db.toArabicNumbers(totalQty)})`;
+                } else {
+                    const totalQty = Object.values(product.warehouses || {}).reduce((sum, qty) => sum + qty, 0);
+                    stockInfo = `مخزون: ${db.toArabicNumbers(totalQty)}`;
+                }
+
+                const price = product.salePrice || product.price || 0;
+                return `
+                    <option value="${product.id}" data-price="${price}" data-stock="${selectedWarehouse ? (product.warehouses?.[selectedWarehouse] || 0) : Object.values(product.warehouses || {}).reduce((sum, qty) => sum + qty, 0)}">
+                        ${index + 1}. ${product.name} - ${formatCurrency(price)} - ${stockInfo}
+                    </option>
+                `;
+            }).join('')}
         `;
 
     } catch (error) {
@@ -1954,13 +2692,39 @@ function loadCustomers() {
 
         if (!customerSelect) return;
 
-        customerSelect.innerHTML = customers.map(customer =>
-            `<option value="${customer.id}" ${customer.id === 'guest' ? 'selected' : ''}>${customer.name}</option>`
+        customerSelect.innerHTML = customers.map((customer, index) =>
+            `<option value="${customer.id}" ${customer.id === 'guest' ? 'selected' : ''}>${index + 1}. ${customer.name}</option>`
         ).join('');
 
     } catch (error) {
         console.error('خطأ في تحميل العملاء:', error);
     }
+}
+
+// تحميل المخازن
+function loadWarehouses() {
+    try {
+        const warehouses = db.getTable('warehouses').filter(w => w.isActive);
+        const warehouseSelect = document.getElementById('warehouseSelect');
+
+        if (!warehouseSelect) return;
+
+        warehouseSelect.innerHTML = `
+            <option value="">جميع المخازن</option>
+            ${warehouses.map((warehouse, index) =>
+                `<option value="${warehouse.id}">${index + 1}. ${warehouse.name}</option>`
+            ).join('')}
+        `;
+
+    } catch (error) {
+        console.error('خطأ في تحميل المخازن:', error);
+    }
+}
+
+// تحديث المنتجات حسب المخزن المحدد
+function updateWarehouseProducts() {
+    const selectedWarehouse = document.getElementById('warehouseSelect').value;
+    loadProductsDropdown(selectedWarehouse);
 }
 
 // متغير سلة المشتريات
@@ -2400,7 +3164,7 @@ function completeSale() {
             updateCartSummary();
 
             // إعادة تحميل المنتجات
-            loadSalesProducts();
+            loadProductsDropdown();
 
             // تحديث لوحة المعلومات
             updateDashboard();
@@ -2498,6 +3262,16 @@ function printInvoice(sale) {
     `;
 
     printContent(invoiceContent, 'فاتورة بيع');
+}
+
+// طباعة الفاتورة بالمعرف
+function printInvoiceById(saleId) {
+    const sale = db.findById('sales', saleId);
+    if (!sale) {
+        showNotification('الفاتورة غير موجودة', 'error');
+        return;
+    }
+    printInvoice(sale);
 }
 
 // تحميل قسم العملاء
@@ -3867,46 +4641,56 @@ function loadSuppliersList() {
             const balanceIcon = supplier.balance > 0 ? 'fa-arrow-up' : supplier.balance < 0 ? 'fa-arrow-down' : 'fa-minus';
 
             return `
-                <div class="customer-card supplier-card" data-balance="${balanceClass}">
+                <div class="customer-card" data-balance="${balanceClass}">
                     <div class="customer-header">
-                        <div class="customer-avatar">
-                            <i class="fas fa-truck"></i>
-                        </div>
                         <div class="customer-info">
                             <h3>${supplier.name}</h3>
                             <p class="customer-phone">${supplier.phone || 'لا يوجد هاتف'}</p>
-                            <p class="customer-email">${supplier.email || 'لا يوجد بريد إلكتروني'}</p>
                         </div>
-                        <div class="customer-balance ${balanceClass}">
-                            <i class="fas ${balanceIcon}"></i>
-                            <span>${formatCurrency(Math.abs(supplier.balance))}</span>
+                        <div class="customer-actions">
+                            <button class="btn-icon" onclick="viewSupplierDetails('${supplier.id}')" title="عرض التفاصيل">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn-icon" onclick="editSupplier('${supplier.id}')" title="تعديل">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn-icon btn-danger" onclick="deleteSupplier('${supplier.id}')" title="حذف">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         </div>
                     </div>
 
                     <div class="customer-details">
-                        <div class="detail-item">
+                        ${supplier.email ? `<div class="detail-item">
+                            <i class="fas fa-envelope"></i>
+                            <span>${supplier.email}</span>
+                        </div>` : ''}
+
+                        ${supplier.address ? `<div class="detail-item">
                             <i class="fas fa-map-marker-alt"></i>
-                            <span>${supplier.address || 'لا يوجد عنوان'}</span>
-                        </div>
-                        <div class="detail-item">
-                            <i class="fas fa-calendar-alt"></i>
-                            <span>تاريخ الإضافة: ${new Date(supplier.createdAt).toLocaleDateString('ar-SA')}</span>
+                            <span>${supplier.address}</span>
+                        </div>` : ''}
+
+                        <div class="detail-item balance-item ${balanceClass}">
+                            <i class="fas ${balanceIcon}"></i>
+                            <span>الرصيد: ${formatCurrency(Math.abs(supplier.balance))}</span>
                         </div>
                     </div>
 
-                    <div class="customer-actions">
-                        <button class="btn btn-sm btn-primary" onclick="viewSupplierDetails('${supplier.id}')" title="عرض التفاصيل">
-                            <i class="fas fa-eye"></i>
-                            مشاهدة
-                        </button>
-                        <button class="btn btn-sm btn-secondary" onclick="editSupplier('${supplier.id}')" title="تعديل">
-                            <i class="fas fa-edit"></i>
-                            تعديل
-                        </button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteSupplier('${supplier.id}')" title="حذف">
-                            <i class="fas fa-trash"></i>
-                            حذف
-                        </button>
+                    <div class="customer-footer">
+                        <span class="join-date">انضم في: ${formatDate(supplier.createdAt)}</span>
+                        <div class="customer-quick-actions">
+                            ${supplier.balance > 0 ? `
+                                <button class="btn btn-sm btn-warning" onclick="addSupplierPayment('${supplier.id}')">
+                                    <i class="fas fa-money-bill"></i>
+                                    دفعة
+                                </button>
+                            ` : ''}
+                            <button class="btn btn-sm btn-info" onclick="viewSupplierHistory('${supplier.id}')">
+                                <i class="fas fa-history"></i>
+                                السجل
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -3977,46 +4761,56 @@ function displayFilteredSuppliers(suppliers) {
         const balanceIcon = supplier.balance > 0 ? 'fa-arrow-up' : supplier.balance < 0 ? 'fa-arrow-down' : 'fa-minus';
 
         return `
-            <div class="customer-card supplier-card" data-balance="${balanceClass}">
+            <div class="customer-card" data-balance="${balanceClass}">
                 <div class="customer-header">
-                    <div class="customer-avatar">
-                        <i class="fas fa-truck"></i>
-                    </div>
                     <div class="customer-info">
                         <h3>${supplier.name}</h3>
                         <p class="customer-phone">${supplier.phone || 'لا يوجد هاتف'}</p>
-                        <p class="customer-email">${supplier.email || 'لا يوجد بريد إلكتروني'}</p>
                     </div>
-                    <div class="customer-balance ${balanceClass}">
-                        <i class="fas ${balanceIcon}"></i>
-                        <span>${formatCurrency(Math.abs(supplier.balance))}</span>
+                    <div class="customer-actions">
+                        <button class="btn-icon" onclick="viewSupplierDetails('${supplier.id}')" title="عرض التفاصيل">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn-icon" onclick="editSupplier('${supplier.id}')" title="تعديل">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn-icon btn-danger" onclick="deleteSupplier('${supplier.id}')" title="حذف">
+                            <i class="fas fa-trash"></i>
+                        </button>
                     </div>
                 </div>
 
                 <div class="customer-details">
-                    <div class="detail-item">
+                    ${supplier.email ? `<div class="detail-item">
+                        <i class="fas fa-envelope"></i>
+                        <span>${supplier.email}</span>
+                    </div>` : ''}
+
+                    ${supplier.address ? `<div class="detail-item">
                         <i class="fas fa-map-marker-alt"></i>
-                        <span>${supplier.address || 'لا يوجد عنوان'}</span>
-                    </div>
-                    <div class="detail-item">
-                        <i class="fas fa-calendar-alt"></i>
-                        <span>تاريخ الإضافة: ${new Date(supplier.createdAt).toLocaleDateString('ar-SA')}</span>
+                        <span>${supplier.address}</span>
+                    </div>` : ''}
+
+                    <div class="detail-item balance-item ${balanceClass}">
+                        <i class="fas ${balanceIcon}"></i>
+                        <span>الرصيد: ${formatCurrency(Math.abs(supplier.balance))}</span>
                     </div>
                 </div>
 
-                <div class="customer-actions">
-                    <button class="btn btn-sm btn-primary" onclick="viewSupplierDetails('${supplier.id}')" title="عرض التفاصيل">
-                        <i class="fas fa-eye"></i>
-                        مشاهدة
-                    </button>
-                    <button class="btn btn-sm btn-secondary" onclick="editSupplier('${supplier.id}')" title="تعديل">
-                        <i class="fas fa-edit"></i>
-                        تعديل
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteSupplier('${supplier.id}')" title="حذف">
-                        <i class="fas fa-trash"></i>
-                        حذف
-                    </button>
+                <div class="customer-footer">
+                    <span class="join-date">انضم في: ${formatDate(supplier.createdAt)}</span>
+                    <div class="customer-quick-actions">
+                        ${supplier.balance > 0 ? `
+                            <button class="btn btn-sm btn-warning" onclick="addSupplierPayment('${supplier.id}')">
+                                <i class="fas fa-money-bill"></i>
+                                دفعة
+                            </button>
+                        ` : ''}
+                        <button class="btn btn-sm btn-info" onclick="viewSupplierHistory('${supplier.id}')">
+                            <i class="fas fa-history"></i>
+                            السجل
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
@@ -4063,6 +4857,307 @@ function clearSupplierFilters() {
     document.getElementById('supplierSearch').value = '';
     document.getElementById('supplierBalanceFilter').value = '';
     loadSuppliersList();
+}
+
+// إضافة دفعة للمورد
+function addSupplierPayment(supplierId) {
+    const supplier = db.findById('suppliers', supplierId);
+    if (!supplier) {
+        showNotification('المورد غير موجود', 'error');
+        return;
+    }
+
+    const content = `
+        <form id="supplierPaymentForm" onsubmit="saveSupplierPayment(event, '${supplierId}')">
+            <div class="form-group">
+                <label>اسم المورد</label>
+                <input type="text" value="${supplier.name}" readonly>
+            </div>
+
+            <div class="form-group">
+                <label>الرصيد الحالي</label>
+                <input type="text" value="${formatCurrency(supplier.balance)}" readonly>
+            </div>
+
+            <div class="form-group">
+                <label for="paymentAmount">مبلغ الدفعة *</label>
+                <input type="number" id="paymentAmount" step="0.001" min="0" max="${supplier.balance}" required>
+            </div>
+
+            <div class="form-group">
+                <label for="paymentMethod">طريقة الدفع *</label>
+                <select id="paymentMethod" required>
+                    <option value="cash">نقداً</option>
+                    <option value="bank">تحويل بنكي</option>
+                    <option value="check">شيك</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="paymentNotes">ملاحظات</label>
+                <textarea id="paymentNotes" rows="3"></textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i>
+                    حفظ الدفعة
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">
+                    إلغاء
+                </button>
+            </div>
+        </form>
+    `;
+
+    showModal('إضافة دفعة للمورد', content);
+}
+
+// حفظ دفعة المورد
+function saveSupplierPayment(event, supplierId) {
+    event.preventDefault();
+
+    try {
+        const supplier = db.findById('suppliers', supplierId);
+        const amount = parseFloat(document.getElementById('paymentAmount').value);
+        const method = document.getElementById('paymentMethod').value;
+        const notes = document.getElementById('paymentNotes').value.trim();
+
+        if (!amount || amount <= 0) {
+            showNotification('يرجى إدخال مبلغ صحيح', 'error');
+            return;
+        }
+
+        if (amount > supplier.balance) {
+            showNotification('المبلغ أكبر من الرصيد المستحق', 'error');
+            return;
+        }
+
+        // إنشاء سجل الدفعة
+        const payment = {
+            supplierId: supplierId,
+            supplierName: supplier.name,
+            amount: amount,
+            method: method,
+            notes: notes,
+            type: 'supplier_payment'
+        };
+
+        const savedPayment = db.insert('payments', payment);
+
+        if (savedPayment) {
+            // تحديث رصيد المورد
+            db.update('suppliers', supplierId, {
+                balance: supplier.balance - amount
+            });
+
+            showNotification('تم حفظ الدفعة بنجاح', 'success');
+            closeModal();
+            loadSuppliersList();
+            updateDashboard();
+        } else {
+            showNotification('خطأ في حفظ الدفعة', 'error');
+        }
+
+    } catch (error) {
+        console.error('خطأ في حفظ دفعة المورد:', error);
+        showNotification('خطأ في حفظ الدفعة', 'error');
+    }
+}
+
+// عرض سجل المورد
+function viewSupplierHistory(supplierId) {
+    const supplier = db.findById('suppliers', supplierId);
+    if (!supplier) {
+        showNotification('المورد غير موجود', 'error');
+        return;
+    }
+
+    const purchases = db.getTable('purchases');
+    const payments = db.getTable('payments');
+
+    const supplierPurchases = purchases.filter(purchase => purchase.supplierId === supplierId);
+    const supplierPayments = payments.filter(payment => payment.supplierId === supplierId);
+
+    // دمج المعاملات وترتيبها حسب التاريخ
+    const transactions = [
+        ...supplierPurchases.map(purchase => ({
+            ...purchase,
+            type: 'purchase',
+            date: purchase.createdAt,
+            amount: purchase.total,
+            description: `فاتورة شراء #${purchase.id}`
+        })),
+        ...supplierPayments.map(payment => ({
+            ...payment,
+            type: 'payment',
+            date: payment.createdAt,
+            amount: -payment.amount,
+            description: `دفعة - ${payment.method === 'cash' ? 'نقداً' : payment.method === 'bank' ? 'تحويل بنكي' : 'شيك'}`
+        }))
+    ].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const content = `
+        <div class="supplier-history-view">
+            <div class="history-header">
+                <h3>سجل المورد: ${supplier.name}</h3>
+                <div class="supplier-summary">
+                    <div class="summary-item">
+                        <span class="label">الرصيد الحالي:</span>
+                        <span class="value ${supplier.balance > 0 ? 'positive' : supplier.balance < 0 ? 'negative' : 'zero'}">
+                            ${formatCurrency(supplier.balance)}
+                        </span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">إجمالي المشتريات:</span>
+                        <span class="value">${formatCurrency(supplierPurchases.reduce((sum, p) => sum + p.total, 0))}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">إجمالي المدفوعات:</span>
+                        <span class="value">${formatCurrency(supplierPayments.reduce((sum, p) => sum + p.amount, 0))}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="history-transactions">
+                <h4>المعاملات الأخيرة</h4>
+                ${transactions.length === 0 ? `
+                    <div class="no-transactions">
+                        <i class="fas fa-history"></i>
+                        <p>لا توجد معاملات مسجلة</p>
+                    </div>
+                ` : transactions.slice(0, 20).map(transaction => `
+                    <div class="transaction-item ${transaction.type}">
+                        <div class="transaction-info">
+                            <h5>${transaction.description}</h5>
+                            <p>${formatDate(transaction.date, true)}</p>
+                        </div>
+                        <div class="transaction-amount ${transaction.amount > 0 ? 'positive' : 'negative'}">
+                            ${transaction.amount > 0 ? '+' : ''}${formatCurrency(Math.abs(transaction.amount))}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+
+            <div class="history-actions">
+                <button class="btn btn-info" onclick="printSupplierStatement('${supplierId}')">
+                    <i class="fas fa-print"></i>
+                    طباعة كشف الحساب
+                </button>
+                <button class="btn btn-secondary" onclick="closeModal()">
+                    إغلاق
+                </button>
+            </div>
+        </div>
+    `;
+
+    showModal('سجل المورد', content);
+}
+
+// طباعة كشف حساب المورد
+function printSupplierStatement(supplierId) {
+    const supplier = db.findById('suppliers', supplierId);
+    if (!supplier) return;
+
+    const purchases = db.getTable('purchases');
+    const payments = db.getTable('payments');
+
+    const supplierPurchases = purchases.filter(purchase => purchase.supplierId === supplierId);
+    const supplierPayments = payments.filter(payment => payment.supplierId === supplierId);
+
+    const transactions = [
+        ...supplierPurchases.map(purchase => ({
+            date: purchase.createdAt,
+            description: `فاتورة شراء #${purchase.id}`,
+            debit: purchase.total,
+            credit: 0
+        })),
+        ...supplierPayments.map(payment => ({
+            date: payment.createdAt,
+            description: `دفعة - ${payment.method === 'cash' ? 'نقداً' : payment.method === 'bank' ? 'تحويل بنكي' : 'شيك'}`,
+            debit: 0,
+            credit: payment.amount
+        }))
+    ].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    const content = `
+        <div class="statement-print">
+            <div class="statement-header">
+                <h1>كشف حساب المورد</h1>
+                <div class="supplier-info">
+                    <h2>${supplier.name}</h2>
+                    <p>الهاتف: ${supplier.phone || 'غير محدد'}</p>
+                    <p>البريد الإلكتروني: ${supplier.email || 'غير محدد'}</p>
+                    <p>العنوان: ${supplier.address || 'غير محدد'}</p>
+                </div>
+                <div class="statement-period">
+                    <p>تاريخ الكشف: ${formatDate(new Date(), true)}</p>
+                    <p>الرصيد الحالي: ${formatCurrency(supplier.balance)}</p>
+                </div>
+            </div>
+
+            <div class="statement-transactions">
+                <table class="statement-table">
+                    <thead>
+                        <tr>
+                            <th>التاريخ</th>
+                            <th>البيان</th>
+                            <th>مدين</th>
+                            <th>دائن</th>
+                            <th>الرصيد</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${transactions.map((transaction, index) => {
+                            const runningBalance = transactions.slice(0, index + 1)
+                                .reduce((balance, t) => balance + t.debit - t.credit, 0);
+
+                            return `
+                                <tr>
+                                    <td>${formatDate(transaction.date, true)}</td>
+                                    <td>${transaction.description}</td>
+                                    <td>${transaction.debit > 0 ? formatCurrency(transaction.debit) : '-'}</td>
+                                    <td>${transaction.credit > 0 ? formatCurrency(transaction.credit) : '-'}</td>
+                                    <td>${formatCurrency(runningBalance)}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="statement-summary">
+                <table class="summary-table">
+                    <tr>
+                        <td>إجمالي المشتريات:</td>
+                        <td>${formatCurrency(supplierPurchases.reduce((sum, p) => sum + p.total, 0))}</td>
+                    </tr>
+                    <tr>
+                        <td>إجمالي المدفوعات:</td>
+                        <td>${formatCurrency(supplierPayments.reduce((sum, p) => sum + p.amount, 0))}</td>
+                    </tr>
+                    <tr class="total-row">
+                        <td>الرصيد النهائي:</td>
+                        <td>${formatCurrency(supplier.balance)}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <style>
+            .statement-print { font-family: 'Cairo', sans-serif; }
+            .statement-header { text-align: center; margin-bottom: 2rem; border-bottom: 2px solid #333; padding-bottom: 1rem; }
+            .supplier-info h2 { margin: 0.5rem 0; color: #333; }
+            .statement-table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+            .statement-table th, .statement-table td { padding: 0.5rem; border: 1px solid #ddd; text-align: right; }
+            .statement-table th { background: #f5f5f5; font-weight: bold; }
+            .summary-table { width: 50%; margin-left: auto; border-collapse: collapse; margin-top: 2rem; }
+            .summary-table td { padding: 0.5rem; border-bottom: 1px solid #ddd; }
+            .summary-table .total-row { font-weight: bold; border-top: 2px solid #333; }
+        </style>
+    `;
+
+    printContent(content, `كشف حساب المورد - ${supplier.name}`);
 }
 
 // عرض نافذة إضافة مورد
@@ -4787,8 +5882,8 @@ function loadSuppliersFilter() {
         if (!filter) return;
 
         filter.innerHTML = '<option value="">جميع الموردين</option>' +
-            suppliers.map(supplier =>
-                `<option value="${supplier.id}">${supplier.name}</option>`
+            suppliers.map((supplier, index) =>
+                `<option value="${supplier.id}">${index + 1}. ${supplier.name}</option>`
             ).join('');
 
     } catch (error) {
@@ -4866,7 +5961,52 @@ function clearPurchaseFilters() {
     loadPurchasesSection();
 }
 
-// عرض نافذة إضافة فاتورة شراء
+// وظائف ترقيم فواتير الشراء التلقائي
+function getNextPurchaseInvoiceNumber() {
+    try {
+        let counter = parseInt(localStorage.getItem('purchase_invoice_counter') || '0');
+        counter++;
+        localStorage.setItem('purchase_invoice_counter', counter.toString());
+        return formatInvoiceNumber(counter);
+    } catch (error) {
+        console.error('خطأ في الحصول على رقم الفاتورة التالي:', error);
+        // استخدام رقم احتياطي بناءً على عدد الفواتير الموجودة
+        const purchases = db.getTable('purchases');
+        return formatInvoiceNumber(purchases.length + 1);
+    }
+}
+
+function formatInvoiceNumber(number) {
+    if (number < 100) {
+        return number.toString().padStart(2, '0'); // 01, 02, ..., 99
+    } else {
+        return number.toString(); // 100, 101, 102, ...
+    }
+}
+
+function savePurchaseInvoiceCounter(number) {
+    try {
+        localStorage.setItem('purchase_invoice_counter', number.toString());
+    } catch (error) {
+        console.error('خطأ في حفظ عداد فواتير الشراء:', error);
+    }
+}
+
+function getCurrentPurchaseInvoiceNumber() {
+    try {
+        const counter = parseInt(localStorage.getItem('purchase_invoice_counter') || '0');
+        return formatInvoiceNumber(counter + 1);
+    } catch (error) {
+        console.error('خطأ في الحصول على رقم الفاتورة الحالي:', error);
+        const purchases = db.getTable('purchases');
+        return formatInvoiceNumber(purchases.length + 1);
+    }
+}
+
+// معالج أحداث المخازن لفاتورة الشراء
+let purchaseWarehouseEventHandler = null;
+
+// عرض نافذة إضافة فاتورة شراء مع التحديث الفوري للمخازن
 function showAddPurchaseModal() {
     const suppliers = db.getTable('suppliers');
     const products = db.getTable('products');
@@ -4876,15 +6016,32 @@ function showAddPurchaseModal() {
         return;
     }
 
+    // إزالة معالج الأحداث السابق إن وجد
+    if (purchaseWarehouseEventHandler) {
+        warehouseEventSystem.removeEventListener(purchaseWarehouseEventHandler);
+    }
+
+    // إنشاء معالج جديد للأحداث
+    purchaseWarehouseEventHandler = function(eventType, warehouseData) {
+        if (eventType === 'warehouse_added' || eventType === 'warehouse_updated') {
+            // تحديث توزيع المخازن فوراً عند إضافة مخزن جديد
+            updateWarehouseDistribution();
+            showNotification(`تم تحديث قائمة المخازن - تمت إضافة: ${warehouseData.name}`, 'info');
+        }
+    };
+
+    // تسجيل معالج الأحداث
+    warehouseEventSystem.addEventListener(purchaseWarehouseEventHandler);
+
     const content = `
         <form id="purchaseForm" onsubmit="savePurchase(event)">
             <div class="form-grid">
                 <div class="form-group">
                     <label for="purchaseSupplier">المورد *</label>
-                    <select id="purchaseSupplier" required>
+                    <select id="purchaseSupplier" required onchange="filterProductsBySupplier()">
                         <option value="">اختر المورد</option>
-                        ${suppliers.map(supplier =>
-                            `<option value="${supplier.id}">${supplier.name}</option>`
+                        ${suppliers.map((supplier, index) =>
+                            `<option value="${supplier.id}">${index + 1}. ${supplier.name}</option>`
                         ).join('')}
                     </select>
                 </div>
@@ -4896,7 +6053,7 @@ function showAddPurchaseModal() {
 
                 <div class="form-group">
                     <label for="invoiceNumber">رقم الفاتورة</label>
-                    <input type="text" id="invoiceNumber" placeholder="رقم فاتورة المورد">
+                    <input type="text" id="invoiceNumber" value="${getCurrentPurchaseInvoiceNumber()}" readonly class="auto-generated-field">
                 </div>
 
                 <div class="form-group">
@@ -4926,16 +6083,32 @@ function showAddPurchaseModal() {
                 <div class="purchase-totals">
                     <div class="total-row">
                         <span>المجموع الفرعي:</span>
-                        <span id="purchaseSubtotal">٠.٠٠ ر.س</span>
+                        <span id="purchaseSubtotal">٠.٠٠ د.ك</span>
                     </div>
-                    <div class="total-row">
-                        <span>الضريبة:</span>
-                        <span id="purchaseTax">٠.٠٠ ر.س</span>
+                    <div class="total-row manual-input">
+                        <label for="manualDiscount">الخصم (يدوي):</label>
+                        <input type="number" id="manualDiscount" min="0" step="0.001" value="0" onchange="updatePurchaseTotals()" placeholder="0.000">
+                        <span>د.ك</span>
+                    </div>
+                    <div class="total-row manual-input">
+                        <label for="manualTax">الضريبة (يدوي):</label>
+                        <input type="number" id="manualTax" min="0" step="0.001" value="0" onchange="updatePurchaseTotals()" placeholder="0.000">
+                        <span>د.ك</span>
                     </div>
                     <div class="total-row total">
                         <span>المجموع الكلي:</span>
-                        <span id="purchaseTotal">٠.٠٠ ر.س</span>
+                        <span id="purchaseTotal">٠.٠٠ د.ك</span>
                     </div>
+                </div>
+            </div>
+
+            <div class="warehouse-distribution-section" id="warehouseDistributionSection" style="display: none;">
+                <h4>توزيع المنتجات على المخازن</h4>
+                <div class="distribution-info">
+                    <p>قم بتوزيع كمية كل منتج على المخازن المختلفة. يجب أن يكون مجموع التوزيع مساوياً للكمية المشتراة.</p>
+                </div>
+                <div id="warehouseDistributionItems" class="warehouse-distribution-items">
+                    <!-- توزيع المنتجات سيظهر هنا -->
                 </div>
             </div>
 
@@ -4949,25 +6122,93 @@ function showAddPurchaseModal() {
                     <i class="fas fa-save"></i>
                     حفظ فاتورة الشراء
                 </button>
-                <button type="button" class="btn btn-secondary" onclick="closeModal()">
+                <button type="button" class="btn btn-secondary" onclick="closePurchaseModal()">
                     إلغاء
                 </button>
             </div>
         </form>
     `;
 
-    showModal('إضافة فاتورة شراء', content);
+    showModal('إضافة فاتورة شراء', content, 'fullpage');
 
     // إضافة صنف افتراضي
     addPurchaseItem();
 }
 
+// إغلاق نافذة فاتورة الشراء مع تنظيف معالجات الأحداث
+function closePurchaseModal() {
+    // إزالة معالج أحداث المخازن
+    if (purchaseWarehouseEventHandler) {
+        warehouseEventSystem.removeEventListener(purchaseWarehouseEventHandler);
+        purchaseWarehouseEventHandler = null;
+    }
+
+    // إعادة تعيين متغيرات الفاتورة
+    purchaseItems = [];
+
+    // إغلاق النافذة
+    closeModal();
+}
+
 // متغير لأصناف الشراء
 let purchaseItems = [];
 
-// إضافة صنف للشراء
-function addPurchaseItem() {
+// تصفية المنتجات حسب المورد المحدد
+function filterProductsBySupplier() {
+    const selectedSupplierId = document.getElementById('purchaseSupplier').value;
+
+    // تحديث جميع قوائم المنتجات في الأصناف الموجودة
+    const productSelects = document.querySelectorAll('.item-product');
+    productSelects.forEach(select => {
+        updateProductOptions(select, selectedSupplierId);
+    });
+
+    // إعادة تعيين قيم المنتجات المحددة إذا لم تعد متوافقة مع المورد الجديد
+    purchaseItems.forEach((item, index) => {
+        if (item.productId) {
+            const products = db.getTable('products');
+            const product = products.find(p => p.id === item.productId);
+            if (!product || product.supplierId !== selectedSupplierId) {
+                // إعادة تعيين المنتج إذا لم يعد متوافقاً مع المورد
+                const productSelect = document.querySelector(`[data-index="${index}"] .item-product`);
+                if (productSelect) {
+                    productSelect.value = '';
+                    updatePurchaseItem(index);
+                }
+            }
+        }
+    });
+}
+
+// تحديث خيارات المنتجات في القائمة المنسدلة
+function updateProductOptions(selectElement, supplierId) {
     const products = db.getTable('products');
+    const filteredProducts = supplierId ?
+        products.filter(product => product.supplierId === supplierId) :
+        products;
+
+    const currentValue = selectElement.value;
+
+    selectElement.innerHTML = `
+        <option value="">اختر المنتج</option>
+        ${filteredProducts.map(product =>
+            `<option value="${product.id}" data-price="${product.purchasePrice || product.price || 0}">${product.name}</option>`
+        ).join('')}
+    `;
+
+    // الحفاظ على القيمة المحددة إذا كانت متوافقة
+    if (currentValue && filteredProducts.some(p => p.id === currentValue)) {
+        selectElement.value = currentValue;
+    }
+}
+
+// إضافة صنف للشراء مع تصفية المنتجات
+function addPurchaseItem() {
+    const selectedSupplierId = document.getElementById('purchaseSupplier').value;
+    const products = db.getTable('products');
+    const filteredProducts = selectedSupplierId ?
+        products.filter(product => product.supplierId === selectedSupplierId) :
+        products;
     const itemIndex = purchaseItems.length;
 
     const itemHtml = `
@@ -4975,8 +6216,8 @@ function addPurchaseItem() {
             <div class="item-controls">
                 <select class="item-product" onchange="updatePurchaseItem(${itemIndex})" required>
                     <option value="">اختر المنتج</option>
-                    ${products.map(product =>
-                        `<option value="${product.id}" data-price="${product.price}">${product.name}</option>`
+                    ${filteredProducts.map(product =>
+                        `<option value="${product.id}" data-price="${product.purchasePrice || product.price || 0}">${product.name}</option>`
                     ).join('')}
                 </select>
 
@@ -4984,7 +6225,7 @@ function addPurchaseItem() {
 
                 <input type="number" class="item-price" placeholder="سعر الوحدة" min="0" step="0.01" onchange="updatePurchaseItem(${itemIndex})" required>
 
-                <span class="item-total">٠.٠٠ ر.س</span>
+                <span class="item-total">٠.٠٠ د.ك</span>
 
                 <button type="button" class="btn-icon btn-danger" onclick="removePurchaseItem(${itemIndex})">
                     <i class="fas fa-trash"></i>
@@ -5043,6 +6284,9 @@ function updatePurchaseItem(index) {
 
     // تحديث المجاميع
     updatePurchaseTotals();
+
+    // تحديث توزيع المخازن
+    updateWarehouseDistribution();
 }
 
 // إزالة صنف من الشراء
@@ -5070,17 +6314,193 @@ function removePurchaseItem(index) {
     }
 }
 
-// تحديث مجاميع الشراء
+// تحديث مجاميع الشراء مع الضريبة والخصم اليدوي
 function updatePurchaseTotals() {
     const subtotal = purchaseItems.reduce((sum, item) => sum + item.total, 0);
-    const settings = db.getTable('settings');
-    const taxRate = settings.taxRate ?? 15;
-    const taxAmount = subtotal * (taxRate / 100);
-    const total = subtotal + taxAmount;
+
+    // الحصول على القيم اليدوية للضريبة والخصم
+    const manualDiscountInput = document.getElementById('manualDiscount');
+    const manualTaxInput = document.getElementById('manualTax');
+
+    const discountAmount = manualDiscountInput ? parseFloat(manualDiscountInput.value) || 0 : 0;
+    const taxAmount = manualTaxInput ? parseFloat(manualTaxInput.value) || 0 : 0;
+
+    const total = subtotal - discountAmount + taxAmount;
 
     document.getElementById('purchaseSubtotal').textContent = formatCurrency(subtotal);
-    document.getElementById('purchaseTax').textContent = formatCurrency(taxAmount);
     document.getElementById('purchaseTotal').textContent = formatCurrency(total);
+}
+
+// تحديث توزيع المخازن للمشتريات مع التحديث الفوري
+function updateWarehouseDistribution() {
+    const validItems = purchaseItems.filter(item => item.productId && item.quantity > 0);
+    const distributionSection = document.getElementById('warehouseDistributionSection');
+    const distributionContainer = document.getElementById('warehouseDistributionItems');
+
+    if (!distributionSection || !distributionContainer) return;
+
+    if (validItems.length === 0) {
+        distributionSection.style.display = 'none';
+        return;
+    }
+
+    distributionSection.style.display = 'block';
+
+    // تحميل جميع المخازن النشطة من قاعدة البيانات (تحديث فوري)
+    const warehouses = db.getTable('warehouses').filter(w => w.isActive);
+
+    // حفظ القيم الحالية قبل إعادة الإنشاء
+    const currentValues = {};
+    validItems.forEach((item, itemIndex) => {
+        currentValues[itemIndex] = {};
+        warehouses.forEach(warehouse => {
+            const input = document.getElementById(`dist_${itemIndex}_${warehouse.id}`);
+            if (input) {
+                currentValues[itemIndex][warehouse.id] = parseInt(input.value) || 0;
+            }
+        });
+    });
+
+    distributionContainer.innerHTML = validItems.map((item, itemIndex) => {
+        const product = db.findById('products', item.productId);
+        if (!product) return '';
+
+        return `
+            <div class="distribution-item" data-item-index="${itemIndex}">
+                <div class="distribution-header">
+                    <h5>${product.name}</h5>
+                    <span class="total-quantity">الكمية الإجمالية: ${db.toArabicNumbers(item.quantity)}</span>
+                    <span class="warehouse-count">المخازن المتاحة: ${db.toArabicNumbers(warehouses.length)}</span>
+                </div>
+                <div class="warehouse-distribution-grid" id="warehouseGrid_${itemIndex}">
+                    ${warehouses.map(warehouse => {
+                        const savedValue = currentValues[itemIndex]?.[warehouse.id] || 0;
+                        return `
+                            <div class="warehouse-dist-item">
+                                <label for="dist_${itemIndex}_${warehouse.id}">${warehouse.name}:</label>
+                                <input type="number"
+                                       id="dist_${itemIndex}_${warehouse.id}"
+                                       class="warehouse-dist-input"
+                                       min="0"
+                                       max="${item.quantity}"
+                                       value="${savedValue}"
+                                       data-item-index="${itemIndex}"
+                                       data-warehouse-id="${warehouse.id}"
+                                       onchange="validateDistribution(${itemIndex})">
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <div class="distribution-summary">
+                    <span class="distributed-total">الموزع: <span id="distributed_${itemIndex}">0</span></span>
+                    <span class="remaining-total">المتبقي: <span id="remaining_${itemIndex}">${item.quantity}</span></span>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // إعادة حساب التوزيع للعناصر الموجودة
+    validItems.forEach((item, itemIndex) => {
+        validateDistribution(itemIndex);
+    });
+
+    // توزيع تلقائي على المخزن الرئيسي للعناصر الجديدة فقط
+    validItems.forEach((item, itemIndex) => {
+        const hasDistribution = warehouses.some(warehouse => {
+            const input = document.getElementById(`dist_${itemIndex}_${warehouse.id}`);
+            return input && parseInt(input.value) > 0;
+        });
+
+        if (!hasDistribution) {
+            const mainWarehouseInput = document.getElementById(`dist_${itemIndex}_main`);
+            if (mainWarehouseInput) {
+                mainWarehouseInput.value = item.quantity;
+                validateDistribution(itemIndex);
+            }
+        }
+    });
+}
+
+// تحديث توزيع المخازن للعنصر المحدد (للتحديث الفوري)
+function refreshWarehouseDistributionForItem(itemIndex) {
+    const item = purchaseItems[itemIndex];
+    if (!item) return;
+
+    const warehouses = db.getTable('warehouses').filter(w => w.isActive);
+    const warehouseGrid = document.getElementById(`warehouseGrid_${itemIndex}`);
+
+    if (!warehouseGrid) return;
+
+    // حفظ القيم الحالية
+    const currentValues = {};
+    warehouses.forEach(warehouse => {
+        const input = document.getElementById(`dist_${itemIndex}_${warehouse.id}`);
+        if (input) {
+            currentValues[warehouse.id] = parseInt(input.value) || 0;
+        }
+    });
+
+    // إعادة إنشاء شبكة التوزيع
+    warehouseGrid.innerHTML = warehouses.map(warehouse => {
+        const savedValue = currentValues[warehouse.id] || 0;
+        return `
+            <div class="warehouse-dist-item">
+                <label for="dist_${itemIndex}_${warehouse.id}">${warehouse.name}:</label>
+                <input type="number"
+                       id="dist_${itemIndex}_${warehouse.id}"
+                       class="warehouse-dist-input"
+                       min="0"
+                       max="${item.quantity}"
+                       value="${savedValue}"
+                       data-item-index="${itemIndex}"
+                       data-warehouse-id="${warehouse.id}"
+                       onchange="validateDistribution(${itemIndex})">
+            </div>
+        `;
+    }).join('');
+
+    // تحديث عداد المخازن
+    const warehouseCountSpan = document.querySelector(`[data-item-index="${itemIndex}"] .warehouse-count`);
+    if (warehouseCountSpan) {
+        warehouseCountSpan.textContent = `المخازن المتاحة: ${db.toArabicNumbers(warehouses.length)}`;
+    }
+
+    // إعادة حساب التوزيع
+    validateDistribution(itemIndex);
+}
+
+// التحقق من صحة التوزيع
+function validateDistribution(itemIndex) {
+    const item = purchaseItems[itemIndex];
+    if (!item) return;
+
+    const warehouses = db.getTable('warehouses').filter(w => w.isActive);
+    let totalDistributed = 0;
+
+    warehouses.forEach(warehouse => {
+        const input = document.getElementById(`dist_${itemIndex}_${warehouse.id}`);
+        if (input) {
+            totalDistributed += parseInt(input.value) || 0;
+        }
+    });
+
+    const distributedSpan = document.getElementById(`distributed_${itemIndex}`);
+    const remainingSpan = document.getElementById(`remaining_${itemIndex}`);
+
+    if (distributedSpan) distributedSpan.textContent = db.toArabicNumbers(totalDistributed);
+    if (remainingSpan) remainingSpan.textContent = db.toArabicNumbers(item.quantity - totalDistributed);
+
+    // تغيير لون المؤشرات حسب الحالة
+    const distributionItem = document.querySelector(`[data-item-index="${itemIndex}"]`);
+    if (distributionItem) {
+        if (totalDistributed === item.quantity) {
+            distributionItem.classList.remove('invalid-distribution');
+            distributionItem.classList.add('valid-distribution');
+        } else {
+            distributionItem.classList.remove('valid-distribution');
+            distributionItem.classList.add('invalid-distribution');
+        }
+    }
 }
 
 // حفظ فاتورة الشراء
@@ -5110,12 +6530,11 @@ function savePurchase(event) {
             return;
         }
 
-        // حساب المجاميع
+        // حساب المجاميع مع الضريبة والخصم اليدوي
         const subtotal = validItems.reduce((sum, item) => sum + item.total, 0);
-        const settings = db.getTable('settings');
-        const taxRate = settings.taxRate ?? 15;
-        const taxAmount = subtotal * (taxRate / 100);
-        const total = subtotal + taxAmount;
+        const discountAmount = parseFloat(document.getElementById('manualDiscount').value) || 0;
+        const taxAmount = parseFloat(document.getElementById('manualTax').value) || 0;
+        const total = subtotal - discountAmount + taxAmount;
 
         // إنشاء فاتورة الشراء
         const purchase = {
@@ -5134,7 +6553,7 @@ function savePurchase(event) {
                 };
             }),
             subtotal: subtotal,
-            taxRate: taxRate,
+            discountAmount: discountAmount,
             taxAmount: taxAmount,
             total: total,
             paymentMethod: paymentMethod,
@@ -5146,12 +6565,49 @@ function savePurchase(event) {
         const savedPurchase = db.insert('purchases', purchase);
 
         if (savedPurchase) {
-            // تحديث المخزون
-            validItems.forEach(item => {
+            // تحديث عداد فواتير الشراء (تأكيد الحفظ الناجح)
+            try {
+                const currentCounter = parseInt(localStorage.getItem('purchase_invoice_counter') || '0');
+                savePurchaseInvoiceCounter(currentCounter + 1);
+            } catch (error) {
+                console.error('خطأ في تحديث عداد فواتير الشراء:', error);
+            }
+
+            // تحديث المخزون حسب التوزيع
+            validItems.forEach((item, itemIndex) => {
                 const product = db.findById('products', item.productId);
                 if (product) {
+                    // جمع توزيع المخازن للمنتج
+                    const warehouses = db.getTable('warehouses').filter(w => w.isActive);
+                    const warehouseDistribution = {};
+                    let totalDistributed = 0;
+
+                    warehouses.forEach(warehouse => {
+                        const input = document.getElementById(`dist_${itemIndex}_${warehouse.id}`);
+                        const distributedQty = input ? (parseInt(input.value) || 0) : 0;
+                        warehouseDistribution[warehouse.id] = distributedQty;
+                        totalDistributed += distributedQty;
+                    });
+
+                    // إذا لم يتم التوزيع، ضع الكمية في المخزن الرئيسي
+                    if (totalDistributed === 0) {
+                        warehouseDistribution['main'] = item.quantity;
+                    }
+
+                    // تحديث كميات المخازن في المنتج
+                    const currentWarehouses = product.warehouses || {};
+                    Object.entries(warehouseDistribution).forEach(([warehouseId, qty]) => {
+                        if (qty > 0) {
+                            currentWarehouses[warehouseId] = (currentWarehouses[warehouseId] || 0) + qty;
+                        }
+                    });
+
+                    // حساب الكمية الإجمالية الجديدة
+                    const newTotalQuantity = Object.values(currentWarehouses).reduce((sum, qty) => sum + qty, 0);
+
                     db.update('products', item.productId, {
-                        quantity: product.quantity + item.quantity
+                        quantity: newTotalQuantity,
+                        warehouses: currentWarehouses
                     });
                 }
             });
@@ -5167,6 +6623,13 @@ function savePurchase(event) {
             }
 
             showNotification('تم حفظ فاتورة الشراء بنجاح', 'success');
+
+            // تنظيف معالجات الأحداث
+            if (purchaseWarehouseEventHandler) {
+                warehouseEventSystem.removeEventListener(purchaseWarehouseEventHandler);
+                purchaseWarehouseEventHandler = null;
+            }
+
             closeModal();
 
             // إعادة تعيين المتغيرات
@@ -5290,9 +6753,9 @@ function editPurchase(purchaseId) {
                 <div class="form-group">
                     <label for="editPurchaseSupplier">المورد *</label>
                     <select id="editPurchaseSupplier" required>
-                        ${suppliers.map(supplier => `
+                        ${suppliers.map((supplier, index) => `
                             <option value="${supplier.id}" ${supplier.id === purchase.supplierId ? 'selected' : ''}>
-                                ${supplier.name}
+                                ${index + 1}. ${supplier.name}
                             </option>
                         `).join('')}
                     </select>
@@ -5311,7 +6774,7 @@ function editPurchase(purchaseId) {
                         <div class="purchase-item-row" data-index="${index}">
                             <select class="item-product" onchange="updateEditItemPrice(${index})">
                                 ${products.map(product => `
-                                    <option value="${product.id}" data-price="${product.price}" ${product.id === item.productId ? 'selected' : ''}>
+                                    <option value="${product.id}" data-price="${product.purchasePrice || product.price || 0}" ${product.id === item.productId ? 'selected' : ''}>
                                         ${product.name}
                                     </option>
                                 `).join('')}
@@ -5361,7 +6824,7 @@ function editPurchase(purchaseId) {
         </form>
     `;
 
-    showModal('تعديل فاتورة الشراء', content);
+    showModal('تعديل فاتورة الشراء', content, 'fullpage');
 }
 
 // حذف فاتورة شراء
@@ -5451,12 +6914,11 @@ function updatePurchase(event, purchaseId) {
             return;
         }
 
-        // حساب المجاميع
+        // حساب المجاميع مع الضريبة والخصم اليدوي
         const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-        const settings = db.getTable('settings');
-        const taxRate = settings.taxRate ?? 15;
-        const taxAmount = subtotal * (taxRate / 100);
-        const total = subtotal + taxAmount;
+        const discountAmount = parseFloat(document.getElementById('manualDiscount').value) || 0;
+        const taxAmount = parseFloat(document.getElementById('manualTax').value) || 0;
+        const total = subtotal - discountAmount + taxAmount;
 
         // استرداد الكميات الأصلية
         const products = db.getTable('products');
@@ -5538,7 +7000,7 @@ function addEditPurchaseItem() {
         <select class="item-product" onchange="updateEditItemPrice(${index})">
             <option value="">اختر منتج</option>
             ${products.map(product => `
-                <option value="${product.id}" data-price="${product.price}">
+                <option value="${product.id}" data-price="${product.purchasePrice || product.price || 0}">
                     ${product.name}
                 </option>
             `).join('')}
@@ -6308,25 +7770,56 @@ function clearPaymentsFilters() {
 // عرض تفاصيل المخزون المنخفض
 function showLowStockDetails() {
     try {
-        const stats = db.getQuickStats();
-        const { lowStockDetails, lowStockThreshold } = stats;
+        const products = db.getTable('products');
+        const warehouses = db.getTable('warehouses').filter(w => w.isActive);
+        const lowStockThreshold = 5;
 
-        if (lowStockDetails.length === 0) {
+        // إنشاء تقرير شامل لجميع المخازن
+        const warehouseGroups = {};
+        const allLowStockDetails = [];
+
+        // التأكد من تضمين جميع المخازن النشطة
+        warehouses.forEach(warehouse => {
+            warehouseGroups[warehouse.id] = {
+                name: warehouse.name,
+                items: []
+            };
+        });
+
+        // فحص كل منتج في كل مخزن
+        products.forEach(product => {
+            warehouses.forEach(warehouse => {
+                const qty = product.warehouses?.[warehouse.id] || 0;
+                const threshold = product.minQuantity || lowStockThreshold;
+
+                if (qty <= threshold) {
+                    const item = {
+                        productId: product.id,
+                        productName: product.name,
+                        warehouseId: warehouse.id,
+                        warehouseName: warehouse.name,
+                        quantity: qty,
+                        threshold: threshold,
+                        status: qty === 0 ? 'out-of-stock' : 'low-stock'
+                    };
+
+                    warehouseGroups[warehouse.id].items.push(item);
+                    allLowStockDetails.push(item);
+                }
+            });
+        });
+
+        // إزالة المخازن التي لا تحتوي على منتجات منخفضة المخزون
+        Object.keys(warehouseGroups).forEach(warehouseId => {
+            if (warehouseGroups[warehouseId].items.length === 0) {
+                delete warehouseGroups[warehouseId];
+            }
+        });
+
+        if (allLowStockDetails.length === 0) {
             showNotification('لا توجد منتجات منخفضة المخزون حالياً', 'info');
             return;
         }
-
-        // تجميع البيانات حسب المخزن
-        const warehouseGroups = {};
-        lowStockDetails.forEach(item => {
-            if (!warehouseGroups[item.warehouseId]) {
-                warehouseGroups[item.warehouseId] = {
-                    name: item.warehouseName,
-                    items: []
-                };
-            }
-            warehouseGroups[item.warehouseId].items.push(item);
-        });
 
         const content = `
             <div class="low-stock-page">
@@ -6343,7 +7836,7 @@ function showLowStockDetails() {
 
                 <div class="low-stock-summary">
                     <div class="low-stock-summary-card">
-                        <h3>${db.toArabicNumbers(lowStockDetails.length)}</h3>
+                        <h3>${db.toArabicNumbers(allLowStockDetails.length)}</h3>
                         <p>إجمالي العناصر المنخفضة</p>
                     </div>
                     <div class="low-stock-summary-card">
@@ -6403,7 +7896,7 @@ function showLowStockDetails() {
             </div>
         `;
 
-        showModal('تقرير المخزون المنخفض', content, 'large');
+        showModal('تقرير المخزون المنخفض', content, 'fullpage');
 
     } catch (error) {
         console.error('خطأ في عرض تفاصيل المخزون المنخفض:', error);
@@ -6621,10 +8114,16 @@ function loadReportsSection() {
             <div class="report-card">
                 <div class="report-header">
                     <h3><i class="fas fa-shopping-cart"></i> تقرير المبيعات</h3>
-                    <button class="btn btn-sm btn-info" onclick="printSalesReport()">
-                        <i class="fas fa-print"></i>
-                        طباعة
-                    </button>
+                    <div class="report-actions">
+                        <button class="btn btn-sm btn-info" onclick="printSalesReport()">
+                            <i class="fas fa-print"></i>
+                            طباعة
+                        </button>
+                        <button class="btn btn-sm btn-success" onclick="exportSalesToExcel()">
+                            <i class="fas fa-file-excel"></i>
+                            تصدير Excel
+                        </button>
+                    </div>
                 </div>
                 <div class="report-content">
                     <div class="report-stats">
@@ -6634,15 +8133,15 @@ function loadReportsSection() {
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">إجمالي المبيعات:</span>
-                            <span class="stat-value" id="salesTotal">٠.٠٠ ر.س</span>
+                            <span class="stat-value" id="salesTotal">٠.٠٠ د.ك</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">متوسط الفاتورة:</span>
-                            <span class="stat-value" id="salesAverage">٠.٠٠ ر.س</span>
+                            <span class="stat-value" id="salesAverage">٠.٠٠ د.ك</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">إجمالي الضريبة:</span>
-                            <span class="stat-value" id="salesTax">٠.٠٠ ر.س</span>
+                            <span class="stat-value" id="salesTax">٠.٠٠ د.ك</span>
                         </div>
                     </div>
                     <div class="report-chart">
@@ -6655,10 +8154,16 @@ function loadReportsSection() {
             <div class="report-card">
                 <div class="report-header">
                     <h3><i class="fas fa-box"></i> تقرير المخزون</h3>
-                    <button class="btn btn-sm btn-info" onclick="printInventoryReport()">
-                        <i class="fas fa-print"></i>
-                        طباعة
-                    </button>
+                    <div class="report-actions">
+                        <button class="btn btn-sm btn-info" onclick="printInventoryReport()">
+                            <i class="fas fa-print"></i>
+                            طباعة
+                        </button>
+                        <button class="btn btn-sm btn-success" onclick="exportInventoryToExcel()">
+                            <i class="fas fa-file-excel"></i>
+                            تصدير Excel
+                        </button>
+                    </div>
                 </div>
                 <div class="report-content">
                     <div class="report-stats">
@@ -6668,7 +8173,7 @@ function loadReportsSection() {
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">قيمة المخزون:</span>
-                            <span class="stat-value" id="inventoryValue">٠.٠٠ ر.س</span>
+                            <span class="stat-value" id="inventoryValue">٠.٠٠ د.ك</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">منتجات منخفضة:</span>
@@ -6800,10 +8305,16 @@ function loadReportsSection() {
             <div class="report-card">
                 <div class="report-header">
                     <h3><i class="fas fa-money-bill-wave"></i> تقرير المدفوعات</h3>
-                    <button class="btn btn-sm btn-info" onclick="printPaymentsReport()">
-                        <i class="fas fa-print"></i>
-                        طباعة
-                    </button>
+                    <div class="report-actions">
+                        <button class="btn btn-sm btn-info" onclick="printPaymentsReport()">
+                            <i class="fas fa-print"></i>
+                            طباعة
+                        </button>
+                        <button class="btn btn-sm btn-success" onclick="exportPaymentsToExcel()">
+                            <i class="fas fa-file-excel"></i>
+                            تصدير Excel
+                        </button>
+                    </div>
                 </div>
                 <div class="report-content">
                     <div class="report-stats">
@@ -6831,10 +8342,16 @@ function loadReportsSection() {
             <div class="report-card">
                 <div class="report-header">
                     <h3><i class="fas fa-warehouse"></i> تقرير المخازن</h3>
-                    <button class="btn btn-sm btn-info" onclick="printWarehousesReport()">
-                        <i class="fas fa-print"></i>
-                        طباعة
-                    </button>
+                    <div class="report-actions">
+                        <button class="btn btn-sm btn-info" onclick="printWarehousesReport()">
+                            <i class="fas fa-print"></i>
+                            طباعة
+                        </button>
+                        <button class="btn btn-sm btn-success" onclick="exportWarehousesToExcel()">
+                            <i class="fas fa-file-excel"></i>
+                            تصدير Excel
+                        </button>
+                    </div>
                 </div>
                 <div class="report-content">
                     <div class="report-stats">
@@ -7740,6 +9257,107 @@ function printProfitReport() {
     printContent(content, 'تقرير الأرباح');
 }
 
+// طباعة تقرير المدفوعات
+function printPaymentsReport() {
+    const fromDate = document.getElementById('reportDateFrom').value;
+    const toDate = document.getElementById('reportDateTo').value;
+
+    if (!fromDate || !toDate) {
+        showNotification('يرجى تحديد نطاق التاريخ', 'error');
+        return;
+    }
+
+    const startDate = new Date(fromDate);
+    const endDate = new Date(toDate);
+    endDate.setHours(23, 59, 59, 999);
+
+    const payments = db.getTable('payments');
+    const filteredPayments = payments.filter(payment => {
+        const paymentDate = new Date(payment.createdAt);
+        return paymentDate >= startDate && paymentDate <= endDate;
+    });
+
+    const paymentsTotal = filteredPayments.reduce((sum, payment) => sum + payment.amount, 0);
+    const customerPayments = filteredPayments.filter(p => p.customerId).reduce((sum, p) => sum + p.amount, 0);
+    const supplierPayments = filteredPayments.filter(p => p.supplierId).reduce((sum, p) => sum + p.amount, 0);
+
+    const content = `
+        <div class="print-report">
+            <div class="report-header">
+                <h1>تقرير المدفوعات</h1>
+                <div class="report-info">
+                    <p>من ${formatDate(startDate)} إلى ${formatDate(endDate)}</p>
+                    <p>إجمالي المدفوعات: ${db.toArabicNumbers(filteredPayments.length)} دفعة</p>
+                </div>
+            </div>
+
+            <div class="report-summary">
+                <h2>ملخص المدفوعات</h2>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <span class="label">إجمالي المدفوعات:</span>
+                        <span class="value">${formatCurrency(paymentsTotal)}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">دفعات العملاء:</span>
+                        <span class="value">${formatCurrency(customerPayments)}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">دفعات الموردين:</span>
+                        <span class="value">${formatCurrency(supplierPayments)}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="report-details">
+                <h2>تفاصيل المدفوعات</h2>
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>التاريخ</th>
+                            <th>النوع</th>
+                            <th>الاسم</th>
+                            <th>المبلغ</th>
+                            <th>طريقة الدفع</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filteredPayments.map(payment => {
+                            const payerName = payment.customerName || payment.supplierName || 'غير محدد';
+                            const paymentType = payment.customerId ? 'عميل' : 'مورد';
+                            return `
+                                <tr>
+                                    <td>${formatDate(payment.createdAt, true)}</td>
+                                    <td>${paymentType}</td>
+                                    <td>${payerName}</td>
+                                    <td>${formatCurrency(payment.amount)}</td>
+                                    <td>${getPaymentMethodText(payment.method)}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="report-footer">
+                <p>تم إنشاء هذا التقرير بواسطة نظام أبو سليمان المحاسبي</p>
+            </div>
+        </div>
+
+        <style>
+            .print-report { font-family: 'Cairo', sans-serif; }
+            .report-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+            .report-table th, .report-table td { padding: 0.5rem; border: 1px solid #ddd; text-align: right; }
+            .report-table th { background: #f5f5f5; font-weight: bold; }
+            .summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 1rem; }
+            .summary-item { display: flex; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid #ddd; }
+            .summary-item .label { font-weight: bold; }
+        </style>
+    `;
+
+    printContent(content, 'تقرير المدفوعات');
+}
+
 // تصدير تقرير العملاء إلى Excel
 function exportCustomersToExcel() {
     const customers = db.getTable('customers').filter(c => c.id !== 'guest');
@@ -7863,6 +9481,34 @@ function exportPaymentsToExcel() {
     ];
 
     exportToExcel(data, 'تقرير المدفوعات');
+}
+
+// تصدير تقرير المخازن إلى Excel
+function exportWarehousesToExcel() {
+    const warehouses = db.getTable('warehouses').filter(w => w.isActive);
+    const products = db.getTable('products');
+
+    const data = [
+        ['اسم المنتج', 'المخزن الرئيسي', 'فرع السالمية', 'فرع الفروانية', 'الإجمالي', 'القيمة الإجمالية'],
+        ...products.map(product => {
+            const mainQty = product.warehouses?.['main'] || 0;
+            const branch1Qty = product.warehouses?.['branch1'] || 0;
+            const branch2Qty = product.warehouses?.['branch2'] || 0;
+            const totalQty = mainQty + branch1Qty + branch2Qty;
+            const totalValue = totalQty * product.price;
+
+            return [
+                product.name,
+                mainQty,
+                branch1Qty,
+                branch2Qty,
+                totalQty,
+                totalValue
+            ];
+        })
+    ];
+
+    exportToExcel(data, 'تقرير المخازن');
 }
 
 // وظيفة عامة لتصدير البيانات إلى Excel
@@ -8401,7 +10047,7 @@ function loadWarehousesSection() {
 
                     <div class="filter-group">
                         <label class="filter-label">الفئة</label>
-                        <select id="categoryFilter" class="filter-select" onchange="filterInventoryByCategory()">
+                        <select id="inventoryCategoryFilter" class="filter-select" onchange="filterInventoryByCategory()">
                             <option value="">جميع الفئات</option>
                         </select>
                     </div>
@@ -8456,6 +10102,12 @@ function loadWarehousesSection() {
     loadWarehousesGrid();
     loadInventoryTable();
     loadMovementsList();
+
+    // تحميل الفئات والفلاتر
+    setTimeout(() => {
+        loadCategories();
+        loadWarehouseFilters();
+    }, 100);
 }
 
 // تحميل نظرة عامة على المخازن
@@ -8657,13 +10309,13 @@ function loadInventoryTable() {
         ).join('');
 
         tableHeader.innerHTML = `
-            <th>المنتج</th>
-            <th>الفئة</th>
+            <th class="product-name-header">المنتج</th>
+            <th class="category-header">الفئة</th>
             ${warehouseHeaders}
-            <th>الإجمالي</th>
-            <th>الحد الأدنى</th>
-            <th>الحالة</th>
-            <th>الإجراءات</th>
+            <th class="total-header">الإجمالي</th>
+            <th class="min-header">الحد الأدنى</th>
+            <th class="status-header">الحالة</th>
+            <th class="actions-header">الإجراءات</th>
         `;
 
         // تحديث محتوى الجدول
@@ -8719,7 +10371,7 @@ function loadWarehouseFilters() {
         const categories = db.getTable('categories');
 
         const warehouseFilter = document.getElementById('warehouseFilter');
-        const categoryFilter = document.getElementById('categoryFilter');
+        const categoryFilter = document.getElementById('inventoryCategoryFilter');
 
         if (warehouseFilter) {
             warehouseFilter.innerHTML = '<option value="">جميع المخازن</option>' +
@@ -8858,12 +10510,12 @@ function filterInventoryByWarehouse() {
 
         // تحديث رأس الجدول لمخزن واحد
         tableHeader.innerHTML = `
-            <th>المنتج</th>
-            <th>الفئة</th>
-            <th>${warehouse.name}</th>
-            <th>الحد الأدنى</th>
-            <th>الحالة</th>
-            <th>الإجراءات</th>
+            <th class="product-name-header">المنتج</th>
+            <th class="category-header">الفئة</th>
+            <th class="warehouse-header">${warehouse.name}</th>
+            <th class="min-header">الحد الأدنى</th>
+            <th class="status-header">الحالة</th>
+            <th class="actions-header">الإجراءات</th>
         `;
 
         // فلترة المنتجات التي لها كمية في هذا المخزن
@@ -8942,7 +10594,7 @@ function filterInventoryByWarehouse() {
 
 // فلترة المخزون حسب الفئة
 function filterInventoryByCategory() {
-    const selectedCategory = document.getElementById('categoryFilter').value;
+    const selectedCategory = document.getElementById('inventoryCategoryFilter').value;
     const rows = document.querySelectorAll('.inventory-row');
 
     rows.forEach(row => {
@@ -8960,7 +10612,7 @@ function filterInventoryByCategory() {
 function clearInventoryFilters() {
     document.getElementById('inventorySearch').value = '';
     document.getElementById('warehouseFilter').value = '';
-    document.getElementById('categoryFilter').value = '';
+    document.getElementById('inventoryCategoryFilter').value = '';
     loadInventoryTable();
 }
 
@@ -9566,7 +11218,36 @@ function deleteWarehouse(warehouseId) {
     }
 }
 
-// حفظ المخزن
+// نظام الأحداث العام للمخازن
+const warehouseEventSystem = {
+    listeners: [],
+
+    // إضافة مستمع للأحداث
+    addEventListener: function(callback) {
+        this.listeners.push(callback);
+    },
+
+    // إزالة مستمع للأحداث
+    removeEventListener: function(callback) {
+        const index = this.listeners.indexOf(callback);
+        if (index > -1) {
+            this.listeners.splice(index, 1);
+        }
+    },
+
+    // إطلاق حدث تحديث المخازن
+    triggerWarehouseUpdate: function(eventType, warehouseData) {
+        this.listeners.forEach(callback => {
+            try {
+                callback(eventType, warehouseData);
+            } catch (error) {
+                console.error('خطأ في معالج حدث المخزن:', error);
+            }
+        });
+    }
+};
+
+// حفظ المخزن مع التحديث الفوري
 function saveWarehouse(event) {
     event.preventDefault();
 
@@ -9598,6 +11279,8 @@ function saveWarehouse(event) {
         if (savedWarehouse) {
             showNotification('تم حفظ المخزن بنجاح', 'success');
             closeModal();
+
+            // تحديث واجهات المخازن
             loadWarehousesGrid();
             loadWarehousesOverview();
 
@@ -9607,6 +11290,10 @@ function saveWarehouse(event) {
                 loadInventoryTable();
                 loadWarehouseFilters();
             }
+
+            // إطلاق حدث تحديث المخازن للتحديث الفوري
+            warehouseEventSystem.triggerWarehouseUpdate('warehouse_added', savedWarehouse);
+
         } else {
             showNotification('خطأ في حفظ المخزن', 'error');
         }

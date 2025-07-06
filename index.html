@@ -40,11 +40,6 @@
                 </button>
 
                 <div id="loginError" class="login-error" style="display: none;"></div>
-
-                <div class="login-info">
-                    <p>المستخدم الافتراضي: admin</p>
-                    <p>كلمة المرور الافتراضية: admin123</p>
-                </div>
             </form>
         </div>
     </div>
@@ -270,6 +265,148 @@
                     </div>
                 </div>
 
+                <!-- لوحة الاختصارات السريعة -->
+                <div class="quick-actions-section">
+                    <div class="section-title">
+                        <h3><i class="fas fa-bolt"></i> الاختصارات السريعة</h3>
+                        <p>الوصول السريع للوظائف الأكثر استخداماً</p>
+                    </div>
+
+                    <div class="quick-actions-grid">
+                        <!-- مجموعة المبيعات -->
+                        <div class="action-group">
+                            <div class="group-header">
+                                <i class="fas fa-shopping-cart"></i>
+                                <span>المبيعات</span>
+                            </div>
+                            <div class="action-buttons">
+                                <button class="action-btn primary" onclick="showSection('sales')">
+                                    <i class="fas fa-cash-register"></i>
+                                    <span>نقطة البيع</span>
+                                </button>
+                                <button class="action-btn" onclick="showAddInvoiceModal()">
+                                    <i class="fas fa-plus-circle"></i>
+                                    <span>فاتورة جديدة</span>
+                                </button>
+                                <button class="action-btn" onclick="showRecentTransactions()">
+                                    <i class="fas fa-history"></i>
+                                    <span>المعاملات الأخيرة</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- مجموعة المنتجات -->
+                        <div class="action-group">
+                            <div class="group-header">
+                                <i class="fas fa-box"></i>
+                                <span>المنتجات</span>
+                            </div>
+                            <div class="action-buttons">
+                                <button class="action-btn primary" onclick="showAddProductModal()">
+                                    <i class="fas fa-plus"></i>
+                                    <span>إضافة منتج</span>
+                                </button>
+                                <button class="action-btn warning" onclick="showLowStockDetails()">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <span>تنبيهات المخزون</span>
+                                </button>
+                                <button class="action-btn" onclick="showSection('products')">
+                                    <i class="fas fa-warehouse"></i>
+                                    <span>إدارة المخزون</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- مجموعة العملاء -->
+                        <div class="action-group">
+                            <div class="group-header">
+                                <i class="fas fa-users"></i>
+                                <span>العملاء</span>
+                            </div>
+                            <div class="action-buttons">
+                                <button class="action-btn primary" onclick="showAddCustomerModal()">
+                                    <i class="fas fa-user-plus"></i>
+                                    <span>إضافة عميل</span>
+                                </button>
+                                <button class="action-btn" onclick="showPaymentCollection()">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                    <span>تحصيل مدفوعات</span>
+                                </button>
+                                <button class="action-btn" onclick="showCustomerStatements()">
+                                    <i class="fas fa-file-invoice"></i>
+                                    <span>كشوف الحسابات</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- مجموعة الموردين -->
+                        <div class="action-group">
+                            <div class="group-header">
+                                <i class="fas fa-truck"></i>
+                                <span>الموردين</span>
+                            </div>
+                            <div class="action-buttons">
+                                <button class="action-btn primary" onclick="showAddSupplierModal()">
+                                    <i class="fas fa-plus"></i>
+                                    <span>إضافة مورد</span>
+                                </button>
+                                <button class="action-btn" onclick="showAddPurchaseModal()">
+                                    <i class="fas fa-shopping-bag"></i>
+                                    <span>أمر شراء</span>
+                                </button>
+                                <button class="action-btn" onclick="showSupplierPayments()">
+                                    <i class="fas fa-credit-card"></i>
+                                    <span>إدارة المدفوعات</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- مجموعة المخازن -->
+                        <div class="action-group">
+                            <div class="group-header">
+                                <i class="fas fa-warehouse"></i>
+                                <span>المخازن</span>
+                            </div>
+                            <div class="action-buttons">
+                                <button class="action-btn primary" onclick="showStockTransfer()">
+                                    <i class="fas fa-exchange-alt"></i>
+                                    <span>نقل مخزون</span>
+                                </button>
+                                <button class="action-btn" onclick="showInventoryAdjustment()">
+                                    <i class="fas fa-edit"></i>
+                                    <span>تعديل الجرد</span>
+                                </button>
+                                <button class="action-btn" onclick="showMovementHistory()">
+                                    <i class="fas fa-list-alt"></i>
+                                    <span>سجل الحركات</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- مجموعة التقارير -->
+                        <div class="action-group">
+                            <div class="group-header">
+                                <i class="fas fa-chart-bar"></i>
+                                <span>التقارير</span>
+                            </div>
+                            <div class="action-buttons">
+                                <button class="action-btn primary" onclick="showDailySalesReport()">
+                                    <i class="fas fa-calendar-day"></i>
+                                    <span>مبيعات اليوم</span>
+                                </button>
+                                <button class="action-btn" onclick="showInventoryReport()">
+                                    <i class="fas fa-boxes"></i>
+                                    <span>تقرير المخزون</span>
+                                </button>
+                                <button class="action-btn" onclick="showFinancialSummary()">
+                                    <i class="fas fa-calculator"></i>
+                                    <span>الملخص المالي</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- الرسوم البيانية والتنبيهات -->
                 <div class="dashboard-grid">
                     <div class="chart-container">
@@ -369,9 +506,41 @@
 
     <!-- تحميل الملفات -->
     <script src="database.js"></script>
+    <script src="diagnostic.js"></script>
+    <script src="recovery.js"></script>
     <script src="sample-data.js"></script>
     <script src="main.js"></script>
     <script src="app.js"></script>
     <script src="dashboard.js"></script>
+
+    <script>
+        // تهيئة التطبيق مع التشخيص التلقائي
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                // تشغيل التشخيص التلقائي بعد تحميل النظام
+                setTimeout(() => {
+                    if (typeof diagnostic !== 'undefined') {
+                        console.log('🔍 تشغيل التشخيص التلقائي...');
+                        const result = diagnostic.runFullDiagnostic();
+
+                        if (result.status === 'needs_attention') {
+                            console.log('⚠️ تم العثور على مشاكل في النظام');
+                            console.log('💡 استخدم autoFix() للإصلاح التلقائي');
+
+                            // عرض إشعار للمستخدم
+                            if (typeof showNotification === 'function') {
+                                showNotification('تم العثور على مشاكل في النظام. تحقق من وحة التحكم للتفاصيل.', 'warning');
+                            }
+                        } else {
+                            console.log('✅ النظام يعمل بشكل صحيح');
+                        }
+                    }
+                }, 3000);
+
+            } catch (error) {
+                console.error('خطأ في التشخيص التلقائي:', error);
+            }
+        });
+    </script>
 </body>
 </html>

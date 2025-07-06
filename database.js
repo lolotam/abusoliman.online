@@ -6,62 +6,146 @@
 class Database {
     constructor() {
         this.initializeDatabase();
+        this.completeInitialization();
     }
 
     // تهيئة قاعدة البيانات
     initializeDatabase() {
-        // إنشاء الجداول الأساسية إذا لم تكن موجودة
-        this.createTable('settings', {
-            companyName: 'أبوسليمان للمحاسبة',
-            companyAddress: 'الكويت - حولي - شارع تونس',
-            companyPhone: '+965 2262 5555',
-            companyEmail: 'info@abusleman.com.kw',
-            taxRate: 0, // الكويت لا تطبق ضريبة القيمة المضافة حالياً
-            currency: 'د.ك',
-            password: this.hashPassword('123'),
-            theme: 'light',
-            logo: ''
-        });
+        try {
+            // إنشاء الجداول الأساسية إذا لم تكن موجودة
+            this.createTable('settings', {
+                companyName: 'أبوسليمان للمحاسبة',
+                companyAddress: 'الكويت - حولي - شارع تونس',
+                companyPhone: '+965 2262 5555',
+                companyEmail: 'info@abusleman.com.kw',
+                taxRate: 0, // الكويت لا تطبق ضريبة القيمة المضافة حالياً
+                currency: 'د.ك',
+                password: this.hashPassword('123'),
+                theme: 'light',
+                logo: '',
+                initialized: true,
+                version: '1.0'
+            });
 
-        // إعادة تعيين كلمة المرور إذا كانت مختلفة
-        const currentSettings = this.getTable('settings');
-        if (currentSettings && !this.verifyPassword('123', currentSettings.password)) {
-            this.update('settings', 'settings', { password: this.hashPassword('123') });
-            console.log('تم إعادة تعيين كلمة المرور إلى 123');
+            // التحقق من سلامة البيانات وإصلاحها إذا لزم الأمر
+            this.validateAndRepairData();
+
+            console.log('تم تهيئة قاعدة البيانات بنجاح');
+        } catch (error) {
+            console.error('خطأ في تهيئة قاعدة البيانات:', error);
+            this.repairDatabase();
         }
+    }
 
-        this.createTable('products', []);
-        this.createTable('customers', [
-            {
-                id: 'guest',
-                name: 'ضيف',
-                phone: '',
-                email: '',
-                address: '',
-                balance: 0,
-                createdAt: new Date().toISOString()
+    // التحقق من سلامة البيانات وإصلاحها
+    validateAndRepairData() {
+        try {
+            const settings = this.getTable('settings');
+
+            // إصلاح إعدادات النظام إذا كانت تالفة
+            if (!settings || typeof settings !== 'object' || !settings.initialized) {
+                console.log('إصلاح إعدادات النظام...');
+                this.setTable('settings', {
+                    companyName: 'أبوسليمان للمحاسبة',
+                    companyAddress: 'الكويت - حولي - شارع تونس',
+                    companyPhone: '+965 2262 5555',
+                    companyEmail: 'info@abusleman.com.kw',
+                    taxRate: 0,
+                    currency: 'د.ك',
+                    password: this.hashPassword('123'),
+                    theme: 'light',
+                    logo: '',
+                    initialized: true,
+                    version: '1.0'
+                });
             }
-        ]);
-        this.createTable('suppliers', []);
-        this.createTable('sales', []);
-        this.createTable('purchases', []);
-        this.createTable('payments', []);
-        this.createTable('categories', [
-            { id: 'general', name: 'عام', description: 'فئة عامة' },
-            { id: 'electronics', name: 'إلكترونيات', description: 'أجهزة إلكترونية ومعدات' },
-            { id: 'clothing', name: 'ملابس', description: 'ملابس وأزياء' },
-            { id: 'food', name: 'مواد غذائية', description: 'مواد غذائية ومشروبات' },
-            { id: 'home', name: 'أدوات منزلية', description: 'أدوات وأجهزة منزلية' },
-            { id: 'books', name: 'كتب ومكتبة', description: 'كتب وقرطاسية' }
-        ]);
 
-        this.createTable('warehouses', [
-            { id: 'main', name: 'المخزن الرئيسي', location: 'الكويت - حولي', description: 'المخزن الرئيسي للشركة', isActive: true },
-            { id: 'branch1', name: 'فرع السالمية', location: 'الكويت - السالمية', description: 'مخزن فرع السالمية', isActive: true },
-            { id: 'branch2', name: 'فرع الفروانية', location: 'الكويت - الفروانية', description: 'مخزن فرع الفروانية', isActive: true }
-        ]);
+            // التحقق من كلمة المرور وإصلاحها إذا لزم الأمر
+            if (settings && !this.verifyPassword('123', settings.password)) {
+                console.log('إصلاح كلمة المرور...');
+                const updatedSettings = { ...settings, password: this.hashPassword('123') };
+                this.setTable('settings', updatedSettings);
+            }
 
-        this.createTable('inventory_movements', []);
+        } catch (error) {
+            console.error('خطأ في التحقق من سلامة البيانات:', error);
+            this.repairDatabase();
+        }
+    }
+
+    // إصلاح قاعدة البيانات في حالة التلف
+    repairDatabase() {
+        try {
+            console.log('بدء إصلاح قاعدة البيانات...');
+
+            // مسح البيانات التالفة
+            const corruptedTables = ['settings'];
+            corruptedTables.forEach(table => {
+                localStorage.removeItem(table);
+            });
+
+            // إعادة تهيئة الجداول الأساسية
+            this.createTable('settings', {
+                companyName: 'أبوسليمان للمحاسبة',
+                companyAddress: 'الكويت - حولي - شارع تونس',
+                companyPhone: '+965 2262 5555',
+                companyEmail: 'info@abusleman.com.kw',
+                taxRate: 0,
+                currency: 'د.ك',
+                password: this.hashPassword('123'),
+                theme: 'light',
+                logo: '',
+                initialized: true,
+                version: '1.0'
+            });
+
+            console.log('تم إصلاح قاعدة البيانات بنجاح');
+        } catch (error) {
+            console.error('فشل في إصلاح قاعدة البيانات:', error);
+            alert('خطأ في قاعدة البيانات. يرجى مسح بيانات المتصفح وإعادة تحميل الصفحة.');
+        }
+    }
+
+    // إكمال تهيئة الجداول
+    completeInitialization() {
+        try {
+            this.createTable('products', []);
+            this.createTable('customers', [
+                {
+                    id: 'guest',
+                    name: 'ضيف',
+                    phone: '',
+                    email: '',
+                    address: '',
+                    balance: 0,
+                    createdAt: new Date().toISOString()
+                }
+            ]);
+            this.createTable('suppliers', []);
+            this.createTable('sales', []);
+            this.createTable('purchases', []);
+            this.createTable('payments', []);
+            this.createTable('categories', [
+                { id: 'general', name: 'عام', description: 'فئة عامة' },
+                { id: 'electronics', name: 'إلكترونيات', description: 'أجهزة إلكترونية ومعدات' },
+                { id: 'clothing', name: 'ملابس', description: 'ملابس وأزياء' },
+                { id: 'food', name: 'مواد غذائية', description: 'مواد غذائية ومشروبات' },
+                { id: 'home', name: 'أدوات منزلية', description: 'أدوات وأجهزة منزلية' },
+                { id: 'books', name: 'كتب ومكتبة', description: 'كتب وقرطاسية' }
+            ]);
+
+            this.createTable('warehouses', [
+                { id: 'main', name: 'المخزن الرئيسي', location: 'الكويت - حولي', description: 'المخزن الرئيسي للشركة', isActive: true },
+                { id: 'branch1', name: 'فرع السالمية', location: 'الكويت - السالمية', description: 'مخزن فرع السالمية', isActive: true },
+                { id: 'branch2', name: 'فرع الفروانية', location: 'الكويت - الفروانية', description: 'مخزن فرع الفروانية', isActive: true }
+            ]);
+
+            this.createTable('inventory_movements', []);
+
+            console.log('تم إكمال تهيئة جميع الجداول بنجاح');
+        } catch (error) {
+            console.error('خطأ في إكمال تهيئة الجداول:', error);
+        }
     }
 
     // إنشاء جدول جديد
@@ -202,6 +286,16 @@ class Database {
 
     // تحويل الأرقام إلى عربية
     toArabicNumbers(num) {
+        // التحقق من صحة القيمة المدخلة
+        if (num === null || num === undefined || num === '') {
+            return '٠';
+        }
+
+        // التأكد من أن القيمة رقم
+        if (isNaN(num)) {
+            return '٠';
+        }
+
         const arabicNumbers = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
         return num.toString().replace(/[0-9]/g, (digit) => arabicNumbers[parseInt(digit)]);
     }

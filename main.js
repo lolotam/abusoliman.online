@@ -109,28 +109,8 @@ function logout() {
     showNotification('تم تسجيل الخروج بنجاح', 'info');
 }
 
-// إعادة تعيين كلمة المرور
-function resetPassword() {
-    if (confirm('هل تريد إعادة تعيين كلمة المرور إلى 123؟')) {
-        try {
-            // إعادة تعيين كلمة المرور في قاعدة البيانات
-            const newPassword = db.hashPassword('123');
-            db.update('settings', 'settings', { password: newPassword });
-
-            // مسح جلسة تسجيل الدخول
-            sessionStorage.removeItem('isLoggedIn');
-
-            alert('تم إعادة تعيين كلمة المرور بنجاح إلى: 123');
-            console.log('تم إعادة تعيين كلمة المرور إلى 123');
-
-            // إعادة تحميل الصفحة
-            location.reload();
-        } catch (error) {
-            console.error('خطأ في إعادة تعيين كلمة المرور:', error);
-            alert('حدث خطأ في إعادة تعيين كلمة المرور');
-        }
-    }
-}
+// إعادة تعيين كلمة المرور (محذوف لأسباب أمنية)
+// تم إزالة هذه الوظيفة لتحسين الأمان وعدم كشف كلمات المرور الافتراضية
 
 // تهيئة الأحداث
 function initializeEvents() {
@@ -153,13 +133,17 @@ function initializeEvents() {
                         const username = document.getElementById('username').value.trim();
                         const password = document.getElementById('password').value;
 
-                        if (username === 'admin' && password === 'admin123') {
+                        // التحقق من المستخدمين المسجلين في قاعدة البيانات
+                        const users = db.getTable('users');
+                        const user = users.find(u => u.username === username && u.isActive);
+
+                        if (user && db.verifyPassword(password, user.password)) {
                             // تسجيل دخول ناجح
                             sessionStorage.setItem('isLoggedIn', 'true');
                             sessionStorage.setItem('currentUser', JSON.stringify({
-                                username: 'admin',
-                                fullName: 'المدير العام',
-                                role: 'admin'
+                                username: user.username,
+                                fullName: user.fullName,
+                                role: user.role
                             }));
                             showMainApp();
                             showNotification('تم تسجيل الدخول بنجاح', 'success');
