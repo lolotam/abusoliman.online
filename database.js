@@ -5,6 +5,7 @@
 
 // منع إعادة تعريف فئة Database
 if (typeof Database === 'undefined') {
+    console.log('🔧 Defining Database class...');
 
 class Database {
     constructor() {
@@ -497,10 +498,22 @@ class Database {
     }
 }
 
-} // نهاية حماية إعادة التعريف
+// تصدير فئة Database للنطاق العام
+window.Database = Database;
+console.log('✅ Database class exported to global scope');
 
-// إنشاء مثيل من قاعدة البيانات (مع الحماية من إعادة الإنشاء)
+// إنشاء مثيل من قاعدة البيانات داخل نطاق الحماية
 if (typeof window !== 'undefined' && !window.db) {
     window.db = new Database();
     console.log('✅ Database instance created and assigned to window.db');
+}
+
+} // نهاية حماية إعادة التعريف
+else {
+    console.log('ℹ️ Database class already defined, skipping redefinition');
+    // إنشاء مثيل إذا لم يكن موجوداً
+    if (typeof window !== 'undefined' && !window.db) {
+        window.db = new Database();
+        console.log('✅ Database instance created from existing class');
+    }
 }

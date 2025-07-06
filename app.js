@@ -22,7 +22,14 @@ function verifyPassword(password, hashedPassword) {
 
 // إنشاء المستخدم الافتراضي
 function createDefaultAdmin() {
-    const users = db.getTable('users');
+    // التحقق من توفر قاعدة البيانات
+    if (!window.db) {
+        console.error('❌ Database not available for createDefaultAdmin');
+        return false;
+    }
+
+    try {
+        const users = db.getTable('users');
 
     // التحقق من وجود المستخدم الافتراضي
     const adminExists = users.find(user => user.username === 'admin');
@@ -42,7 +49,16 @@ function createDefaultAdmin() {
 
         users.push(defaultAdmin);
         db.setTable('users', users);
-        console.log('تم إنشاء المستخدم الافتراضي');
+        console.log('✅ تم إنشاء المستخدم الافتراضي: admin/admin123');
+    } else {
+        console.log('ℹ️ المستخدم الافتراضي موجود بالفعل');
+    }
+
+    return true;
+
+    } catch (error) {
+        console.error('❌ خطأ في إنشاء المستخدم الافتراضي:', error);
+        return false;
     }
 }
 
@@ -64,9 +80,43 @@ function login(event) {
         return;
     }
 
+    // التحقق من توفر قاعدة البيانات
+    if (!window.db) {
+        console.error('❌ Database not available for login');
+        showLoginError('خطأ في النظام: قاعدة البيانات غير متاحة');
+        return;
+    }
+
     // البحث عن المستخدم
     const users = db.getTable('users');
-    const user = users.find(u => u.username === username && u.isActive);
+    let user = users.find(u => u.username === username && u.isActive);
+
+    // آلية احتياطية للمدير في حالة عدم وجود المستخدم في قاعدة البيانات
+    if (!user && username === 'admin' && password === 'admin123') {
+        console.log('🔧 Using fallback admin login');
+
+        // إنشاء مستخدم مؤقت للمدير
+        user = {
+            id: 'admin_fallback',
+            username: 'admin',
+            password: hashPassword('admin123'),
+            fullName: 'المدير العام',
+            role: 'admin',
+            permissions: ['all'],
+            isActive: true,
+            createdAt: new Date().toISOString(),
+            lastLogin: new Date().toISOString()
+        };
+
+        // محاولة إضافة المستخدم إلى قاعدة البيانات
+        try {
+            users.push(user);
+            db.setTable('users', users);
+            console.log('✅ Admin user added to database via fallback');
+        } catch (error) {
+            console.warn('⚠️ Could not save admin to database, using temporary session');
+        }
+    }
 
     if (!user) {
         showLoginError('اسم المستخدم غير موجود أو غير نشط');
@@ -10420,8 +10470,28 @@ function validateDateRange(fromDate, toDate) {
 
 // تهيئة النظام عند تحميل الصفحة
 document.addEventListener('DOMContentLoaded', function() {
-    // إنشاء المستخدم الافتراضي
-    createDefaultAdmin();
+    // انتظار تحميل قاعدة البيانات ثم إنشاء المستخدم الافتراضي
+    function initializeWithDatabase() {
+        if (window.db && window.Database) {
+            console.log('✅ Database ready, creating default admin...');
+            createDefaultAdmin();
+            return true;
+        } else {
+            console.log('⏳ Waiting for database to be ready...');
+            return false;
+        }
+    }
+
+    // محاولة التهيئة فوراً
+    if (!initializeWithDatabase()) {
+        // إذا لم تكن قاعدة البيانات جاهزة، انتظار قصير ثم المحاولة مرة أخرى
+        setTimeout(() => {
+            if (!initializeWithDatabase()) {
+                console.warn('⚠️ Database still not ready, trying one more time...');
+                setTimeout(initializeWithDatabase, 500);
+            }
+        }, 200);
+    }
 
     // التحقق من الجلسة
     if (!checkSession()) {

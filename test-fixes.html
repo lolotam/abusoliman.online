@@ -331,18 +331,46 @@
         function testDatabase() {
             const testDiv = document.getElementById('functionalityTests');
             let results = [];
-            
+
+            // فحص فئة Database
+            if (typeof Database !== 'undefined') {
+                results.push('<div class="status success">✅ Database class: محددة بشكل صحيح</div>');
+            } else {
+                results.push('<div class="status error">❌ Database class: غير محددة</div>');
+            }
+
+            // فحص مثيل قاعدة البيانات
             if (window.db) {
                 try {
                     const products = window.db.getTable('products');
-                    results.push(`<div class="status success">✅ Database: ${products.length} منتج محمل</div>`);
+                    results.push(`<div class="status success">✅ Database instance: ${products.length} منتج محمل</div>`);
+
+                    // فحص جدول المستخدمين
+                    const users = window.db.getTable('users');
+                    results.push(`<div class="status success">✅ Users table: ${users.length} مستخدم محمل</div>`);
+
+                    // فحص المستخدم الافتراضي
+                    const adminUser = users.find(u => u.username === 'admin');
+                    if (adminUser) {
+                        results.push('<div class="status success">✅ Admin user: موجود في قاعدة البيانات</div>');
+                    } else {
+                        results.push('<div class="status warning">⚠️ Admin user: غير موجود في قاعدة البيانات</div>');
+                    }
+
                 } catch (e) {
                     results.push(`<div class="status error">❌ Database error: ${e.message}</div>`);
                 }
             } else {
-                results.push('<div class="status error">❌ Database: غير متاحة</div>');
+                results.push('<div class="status error">❌ Database instance: غير متاحة</div>');
             }
-            
+
+            // اختبار تسجيل الدخول
+            if (typeof login === 'function') {
+                results.push('<div class="status success">✅ Login function: متاحة</div>');
+            } else {
+                results.push('<div class="status error">❌ Login function: غير متاحة</div>');
+            }
+
             testDiv.innerHTML = results.join('');
         }
         
