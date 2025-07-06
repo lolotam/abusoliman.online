@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>اختبار النظام المودولي - أبوسليمان للمحاسبة</title>
+    
+    <!-- الخطوط -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- الأنماط المودولية -->
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/login.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="stylesheet" href="css/sales.css">
+    <link rel="stylesheet" href="css/products.css">
+    
+    <style>
+        .test-container {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .test-section {
+            background: var(--bg-secondary);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-neumorphic);
+        }
+        
+        .test-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        #testContent {
+            min-height: 400px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            background: var(--bg-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 اختبار النظام المودولي - أبوسليمان للمحاسبة</h1>
+        
+        <div class="test-section">
+            <h2>حالة النظام</h2>
+            <div id="systemStatus">جاري فحص النظام...</div>
+        </div>
+        
+        <div class="test-section">
+            <h2>اختبار تحميل الوحدات</h2>
+            <div class="test-buttons">
+                <button class="btn primary" onclick="testModule('dashboard')">
+                    <i class="fas fa-tachometer-alt"></i>
+                    لوحة المعلومات
+                </button>
+                <button class="btn secondary" onclick="testModule('sales')">
+                    <i class="fas fa-shopping-cart"></i>
+                    المبيعات
+                </button>
+                <button class="btn info" onclick="testModule('products')">
+                    <i class="fas fa-box"></i>
+                    المنتجات
+                </button>
+                <button class="btn success" onclick="testModule('customers')">
+                    <i class="fas fa-users"></i>
+                    العملاء
+                </button>
+                <button class="btn warning" onclick="testModule('suppliers')">
+                    <i class="fas fa-truck"></i>
+                    الموردين
+                </button>
+            </div>
+            
+            <div id="testResults"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>محتوى الوحدة المحملة</h2>
+            <div id="testContent">
+                <p>اختر وحدة لاختبارها من الأزرار أعلاه</p>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>اختبار الوظائف المساعدة</h2>
+            <div class="test-buttons">
+                <button class="btn primary" onclick="testUtilities()">
+                    اختبار الوظائف المساعدة
+                </button>
+                <button class="btn secondary" onclick="testNotifications()">
+                    اختبار الإشعارات
+                </button>
+                <button class="btn info" onclick="testModals()">
+                    اختبار النوافذ المنبثقة
+                </button>
+            </div>
+            <div id="utilityResults"></div>
+        </div>
+    </div>
+
+    <!-- تحميل الملفات الأساسية -->
+    <script src="database.js"></script>
+    <script src="sample-data.js"></script>
+    
+    <!-- نظام القوالب المدمجة -->
+    <script src="js/templates.js"></script>
+    
+    <!-- نظام تحميل الوحدات -->
+    <script src="js/main.js"></script>
+
+    <script>
+        // اختبار النظام المودولي
+        let testResults = [];
+        
+        // فحص حالة النظام عند التحميل
+        window.addEventListener('load', function() {
+            setTimeout(checkSystemStatus, 1000);
+        });
+        
+        function checkSystemStatus() {
+            const statusDiv = document.getElementById('systemStatus');
+            let status = [];
+            
+            // فحص تحميل قاعدة البيانات
+            if (window.Database) {
+                status.push('<div class="status success">✅ قاعدة البيانات: محملة بنجاح</div>');
+            } else {
+                status.push('<div class="status error">❌ قاعدة البيانات: فشل في التحميل</div>');
+            }
+            
+            // فحص تحميل القوالب
+            if (window.Templates) {
+                const templateCount = Object.keys(window.Templates).length;
+                status.push(`<div class="status success">✅ القوالب: ${templateCount} قالب محمل</div>`);
+            } else {
+                status.push('<div class="status error">❌ القوالب: فشل في التحميل</div>');
+            }
+            
+            // فحص تحميل نظام الوحدات
+            if (window.moduleLoader) {
+                status.push('<div class="status success">✅ نظام الوحدات: محمل بنجاح</div>');
+            } else {
+                status.push('<div class="status error">❌ نظام الوحدات: فشل في التحميل</div>');
+            }
+            
+            // فحص الوظائف المساعدة
+            if (window.formatCurrency && window.showNotification) {
+                status.push('<div class="status success">✅ الوظائف المساعدة: متاحة</div>');
+            } else {
+                status.push('<div class="status error">❌ الوظائف المساعدة: غير متاحة</div>');
+            }
+            
+            statusDiv.innerHTML = status.join('');
+        }
+        
+        async function testModule(moduleName) {
+            const resultsDiv = document.getElementById('testResults');
+            const contentDiv = document.getElementById('testContent');
+            
+            try {
+                resultsDiv.innerHTML = `<div class="status info">🔄 جاري اختبار وحدة ${moduleName}...</div>`;
+                
+                // اختبار تحميل القالب
+                if (!window.Templates || !window.Templates[moduleName]) {
+                    throw new Error(`القالب ${moduleName} غير موجود`);
+                }
+                
+                // عرض القالب
+                contentDiv.innerHTML = window.Templates[moduleName];
+                
+                // اختبار تحميل JavaScript الخاص بالوحدة
+                const scriptPath = `js/${moduleName}.js`;
+                await loadScript(scriptPath);
+                
+                // اختبار تشغيل وظيفة التهيئة
+                const initFunctionName = `init${capitalize(moduleName)}`;
+                if (typeof window[initFunctionName] === 'function') {
+                    window[initFunctionName]();
+                    resultsDiv.innerHTML = `<div class="status success">✅ وحدة ${moduleName} تم تحميلها وتشغيلها بنجاح</div>`;
+                } else {
+                    resultsDiv.innerHTML = `<div class="status info">ℹ️ وحدة ${moduleName} تم تحميل القالب بنجاح (لا توجد وظيفة تهيئة)</div>`;
+                }
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="status error">❌ خطأ في تحميل وحدة ${moduleName}: ${error.message}</div>`;
+                contentDiv.innerHTML = `<div class="error">خطأ في تحميل المحتوى: ${error.message}</div>`;
+            }
+        }
+        
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                if (document.querySelector(`script[src="${src}"]`)) {
+                    resolve();
+                    return;
+                }
+                
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = () => reject(new Error(`فشل في تحميل ${src}`));
+                document.head.appendChild(script);
+            });
+        }
+        
+        function capitalize(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+        
+        function testUtilities() {
+            const resultsDiv = document.getElementById('utilityResults');
+            let results = [];
+            
+            // اختبار formatCurrency
+            if (window.formatCurrency) {
+                const formatted = formatCurrency(123.456);
+                results.push(`<div class="status success">✅ formatCurrency: ${formatted}</div>`);
+            } else {
+                results.push('<div class="status error">❌ formatCurrency غير متاح</div>');
+            }
+            
+            // اختبار toArabicNumbers
+            if (window.toArabicNumbers) {
+                const arabic = toArabicNumbers('123456');
+                results.push(`<div class="status success">✅ toArabicNumbers: ${arabic}</div>`);
+            } else {
+                results.push('<div class="status error">❌ toArabicNumbers غير متاح</div>');
+            }
+            
+            resultsDiv.innerHTML = results.join('');
+        }
+        
+        function testNotifications() {
+            if (window.showNotification) {
+                showNotification('هذا اختبار للإشعارات', 'success');
+                showNotification('إشعار تحذيري', 'warning');
+                showNotification('إشعار معلوماتي', 'info');
+            } else {
+                alert('وظيفة الإشعارات غير متاحة');
+            }
+        }
+        
+        function testModals() {
+            if (window.showModal) {
+                showModal('اختبار النافذة المنبثقة', '<p>هذا اختبار للنوافذ المنبثقة في النظام المودولي</p>');
+            } else {
+                alert('وظيفة النوافذ المنبثقة غير متاحة');
+            }
+        }
+    </script>
+</body>
+</html>
