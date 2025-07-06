@@ -1,0 +1,169 @@
+<div class="section-header">
+    <h2><i class="fas fa-box"></i> إدارة المنتجات</h2>
+    <div class="section-actions">
+        <button class="btn primary" onclick="addProduct()">
+            <i class="fas fa-plus"></i>
+            إضافة منتج
+        </button>
+        <button class="btn secondary" onclick="importProducts()">
+            <i class="fas fa-upload"></i>
+            استيراد
+        </button>
+        <button class="btn info" onclick="exportProducts()">
+            <i class="fas fa-download"></i>
+            تصدير
+        </button>
+    </div>
+</div>
+
+<!-- أدوات التحكم -->
+<div class="products-controls">
+    <div class="search-filter-group">
+        <div class="search-box">
+            <input type="text" id="productSearchInput" class="form-input" placeholder="البحث في المنتجات..." onkeyup="searchProducts(this.value)">
+            <i class="fas fa-search"></i>
+        </div>
+        <select id="categoryFilterSelect" class="form-select" onchange="filterProductsByCategory(this.value)">
+            <option value="">جميع الفئات</option>
+        </select>
+        <select id="statusFilterSelect" class="form-select" onchange="filterProductsByStatus(this.value)">
+            <option value="">جميع الحالات</option>
+            <option value="available">متوفر</option>
+            <option value="low-stock">مخزون منخفض</option>
+            <option value="out-of-stock">نفد المخزون</option>
+        </select>
+    </div>
+    <div class="view-toggle">
+        <button class="btn btn-sm" onclick="toggleView('grid')" id="gridViewBtn">
+            <i class="fas fa-th"></i>
+        </button>
+        <button class="btn btn-sm" onclick="toggleView('list')" id="listViewBtn">
+            <i class="fas fa-list"></i>
+        </button>
+    </div>
+</div>
+
+<!-- عرض المنتجات -->
+<div class="products-container">
+    <!-- عرض الشبكة -->
+    <div id="productsGrid" class="products-grid">
+        <!-- المنتجات ستظهر هنا -->
+    </div>
+    
+    <!-- عرض القائمة -->
+    <div id="productsList" class="products-list hidden">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>الصورة</th>
+                    <th>اسم المنتج</th>
+                    <th>الفئة</th>
+                    <th>السعر</th>
+                    <th>المخزون</th>
+                    <th>الحالة</th>
+                    <th>الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody id="productsTableBody">
+                <!-- صفوف المنتجات ستظهر هنا -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- نافذة إضافة/تعديل منتج -->
+<div id="productModal" class="modal-overlay hidden">
+    <div class="modal large">
+        <div class="modal-header">
+            <h3 id="productModalTitle">إضافة منتج جديد</h3>
+            <button class="modal-close" onclick="closeProductModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="productForm" class="product-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">اسم المنتج *</label>
+                        <input type="text" id="productName" class="form-input" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">الفئة</label>
+                        <select id="productCategory" class="form-select">
+                            <option value="">اختر الفئة</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">السعر *</label>
+                        <input type="number" id="productPrice" class="form-input" step="0.001" min="0" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">الكمية *</label>
+                        <input type="number" id="productQuantity" class="form-input" min="0" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">الحد الأدنى للمخزون</label>
+                        <input type="number" id="productMinStock" class="form-input" min="0" value="5">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">الباركود</label>
+                        <input type="text" id="productBarcode" class="form-input">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">الوصف</label>
+                    <textarea id="productDescription" class="form-input" rows="3"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">صورة المنتج</label>
+                    <div class="image-upload-container">
+                        <div class="image-preview" onclick="selectProductImage()">
+                            <img id="productImagePreview" src="" alt="معاينة الصورة" style="display: none;">
+                            <div class="image-overlay">
+                                <i class="fas fa-camera"></i>
+                                <span>اختر صورة</span>
+                            </div>
+                        </div>
+                        <input type="file" id="productImageInput" accept="image/*" style="display: none;" onchange="handleProductImageUpload(this)">
+                        <p class="image-info">الحد الأقصى: 2 ميجابايت، الأنواع المدعومة: JPG, PNG, GIF</p>
+                    </div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="submit" class="btn primary">
+                        <i class="fas fa-save"></i>
+                        حفظ المنتج
+                    </button>
+                    <button type="button" class="btn secondary" onclick="closeProductModal()">
+                        <i class="fas fa-times"></i>
+                        إلغاء
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة تفاصيل المنتج -->
+<div id="productDetailsModal" class="modal-overlay hidden">
+    <div class="modal medium">
+        <div class="modal-header">
+            <h3>تفاصيل المنتج</h3>
+            <button class="modal-close" onclick="closeProductDetailsModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div id="productDetailsContent">
+                <!-- تفاصيل المنتج ستظهر هنا -->
+            </div>
+        </div>
+    </div>
+</div>
