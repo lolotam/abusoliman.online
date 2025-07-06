@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>أبوسليمان للمحاسبة - نظام إدارة نقاط البيع</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- شاشة تسجيل الدخول -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-container">
+            <div class="login-header">
+                <div class="logo">
+                    <i class="fas fa-cash-register"></i>
+                    <h1>أبوسليمان للمحاسبة</h1>
+                    <p>نظام إدارة نقاط البيع</p>
+                </div>
+            </div>
+            <form id="loginForm" class="login-form">
+                <div class="input-group">
+                    <label for="username">اسم المستخدم</label>
+                    <input type="text" id="username" placeholder="أدخل اسم المستخدم" required autocomplete="username">
+                    <i class="fas fa-user"></i>
+                </div>
+
+                <div class="input-group">
+                    <label for="password">كلمة المرور</label>
+                    <input type="password" id="password" placeholder="أدخل كلمة المرور" required autocomplete="current-password">
+                    <i class="fas fa-lock"></i>
+                </div>
+
+                <button type="submit" class="login-btn">
+                    <i class="fas fa-sign-in-alt"></i>
+                    تسجيل الدخول
+                </button>
+
+                <div id="loginError" class="login-error" style="display: none;"></div>
+
+                <div class="login-info">
+                    <p>المستخدم الافتراضي: admin</p>
+                    <p>كلمة المرور الافتراضية: admin123</p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- التطبيق الرئيسي -->
+    <div id="mainApp" class="main-app hidden">
+        <!-- شريط التنقل العلوي -->
+        <header class="top-navbar">
+            <div class="navbar-brand">
+                <button class="mobile-menu-btn" onclick="toggleMobileMenu()" style="display: none;">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <i class="fas fa-cash-register"></i>
+                <span>أبوسليمان للمحاسبة</span>
+            </div>
+            <div class="navbar-controls">
+                <button id="themeToggle" class="theme-toggle">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <div class="user-menu">
+                    <button class="user-btn">
+                        <i class="fas fa-user"></i>
+                        <span class="user-name">المدير</span>
+                    </button>
+                    <div class="dropdown-menu">
+                        <a href="#" onclick="showSection('settings')">
+                            <i class="fas fa-cog"></i>
+                            الإعدادات
+                        </a>
+                        <a href="#" onclick="logout()">
+                            <i class="fas fa-sign-out-alt"></i>
+                            تسجيل الخروج
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Overlay للجوال -->
+        <div class="mobile-overlay" onclick="closeMobileMenu()"></div>
+
+        <!-- الشريط الجانبي -->
+        <aside class="sidebar">
+            <nav class="sidebar-nav">
+                <ul>
+                    <li>
+                        <a href="#" onclick="showSection('dashboard')" class="nav-link active">
+                            <i class="fas fa-tachometer-alt"></i>
+                            <span>لوحة المعلومات</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" onclick="showSection('sales')" class="nav-link">
+                            <i class="fas fa-shopping-cart"></i>
+                            <span>المبيعات</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" onclick="showSection('products')" class="nav-link">
+                            <i class="fas fa-box"></i>
+                            <span>المنتجات</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" onclick="showSection('customers')" class="nav-link">
+                            <i class="fas fa-users"></i>
+                            <span>العملاء</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" onclick="showSection('suppliers')" class="nav-link">
+                            <i class="fas fa-truck"></i>
+                            <span>الموردين</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" onclick="showSection('purchases')" class="nav-link">
+                            <i class="fas fa-shopping-bag"></i>
+                            <span>المشتريات</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" onclick="showSection('warehouses')" class="nav-link">
+                            <i class="fas fa-warehouse"></i>
+                            <span>المخازن</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" onclick="showSection('debts')" class="nav-link">
+                            <i class="fas fa-money-bill-wave"></i>
+                            <span>الديون والمدفوعات</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" onclick="showSection('reports')" class="nav-link">
+                            <i class="fas fa-chart-bar"></i>
+                            <span>التقارير</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" onclick="showSection('settings')" class="nav-link">
+                            <i class="fas fa-cog"></i>
+                            <span>الإعدادات</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- المحتوى الرئيسي -->
+        <main class="main-content">
+            <!-- لوحة المعلومات -->
+            <section id="dashboard" class="content-section active">
+                <div class="section-header">
+                    <h2><i class="fas fa-tachometer-alt"></i> لوحة المعلومات</h2>
+                    <div class="date-time-info">
+                        <div class="date-info">
+                            <div class="hijri-date">
+                                <i class="fas fa-calendar-alt"></i>
+                                <span id="currentHijriDate"></span>
+                            </div>
+                            <div class="gregorian-date">
+                                <i class="fas fa-calendar"></i>
+                                <span id="currentGregorianDate"></span>
+                            </div>
+                        </div>
+                        <div class="time-info">
+                            <div class="current-time">
+                                <i class="fas fa-clock"></i>
+                                <span id="currentTime"></span>
+                            </div>
+                            <div class="day-of-week">
+                                <span id="dayOfWeek"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- بطاقات الإحصائيات -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="totalSales">٠.٠٠٠ د.ك</h3>
+                            <p>إجمالي المبيعات اليوم</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-box"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="totalProducts">٠</h3>
+                            <p>عدد المنتجات</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="totalCustomers">٠</h3>
+                            <p>عدد العملاء</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card clickable-card" onclick="showLowStockDetails()">
+                        <div class="stat-icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="lowStockItems">٠</h3>
+                            <p>منتجات منخفضة المخزون</p>
+                        </div>
+                        <div class="card-action-hint">
+                            <i class="fas fa-external-link-alt"></i>
+                        </div>
+                    </div>
+
+                    <!-- بطاقات الفواتير الجديدة -->
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-receipt"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="totalInvoices">٠</h3>
+                            <p>إجمالي الفواتير</p>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-calendar-day"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="todayInvoices">٠</h3>
+                            <p>فواتير اليوم</p>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-calendar-week"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="weekInvoices">٠</h3>
+                            <p>فواتير هذا الأسبوع</p>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="monthInvoices">٠</h3>
+                            <p>فواتير هذا الشهر</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- الرسوم البيانية والتنبيهات -->
+                <div class="dashboard-grid">
+                    <div class="chart-container">
+                        <h3>مبيعات الأسبوع</h3>
+                        <canvas id="salesChart"></canvas>
+                    </div>
+                    
+                    <div class="alerts-container">
+                        <h3>التنبيهات</h3>
+                        <div id="alertsList" class="alerts-list">
+                            <!-- التنبيهات ستظهر هنا -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- أقسام أخرى ستتم إضافتها -->
+            <section id="sales" class="content-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-shopping-cart"></i> المبيعات</h2>
+                </div>
+                <div class="loading">جاري التحميل...</div>
+            </section>
+
+            <section id="products" class="content-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-box"></i> المنتجات</h2>
+                </div>
+                <div class="loading">جاري التحميل...</div>
+            </section>
+
+            <section id="customers" class="content-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-users"></i> العملاء</h2>
+                </div>
+                <div class="loading">جاري التحميل...</div>
+            </section>
+
+            <section id="suppliers" class="content-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-truck"></i> الموردين</h2>
+                </div>
+                <div class="loading">جاري التحميل...</div>
+            </section>
+
+            <section id="purchases" class="content-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-shopping-bag"></i> المشتريات</h2>
+                </div>
+                <div class="loading">جاري التحميل...</div>
+            </section>
+
+            <section id="warehouses" class="content-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-warehouse"></i> إدارة المخازن</h2>
+                </div>
+                <div class="loading">جاري التحميل...</div>
+            </section>
+
+            <section id="debts" class="content-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-money-bill-wave"></i> الديون والمدفوعات</h2>
+                </div>
+                <div class="loading">جاري التحميل...</div>
+            </section>
+
+            <section id="reports" class="content-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-chart-bar"></i> التقارير</h2>
+                </div>
+                <div class="loading">جاري التحميل...</div>
+            </section>
+
+            <section id="settings" class="content-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-cog"></i> الإعدادات</h2>
+                </div>
+                <div class="loading">جاري التحميل...</div>
+            </section>
+        </main>
+    </div>
+
+    <!-- النوافذ المنبثقة -->
+    <div id="modalOverlay" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">عنوان النافذة</h3>
+                <button class="modal-close" onclick="closeModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- محتوى النافذة -->
+            </div>
+        </div>
+    </div>
+
+    <!-- تحميل الملفات -->
+    <script src="database.js"></script>
+    <script src="sample-data.js"></script>
+    <script src="main.js"></script>
+    <script src="app.js"></script>
+    <script src="dashboard.js"></script>
+</body>
+</html>
