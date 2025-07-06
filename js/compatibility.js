@@ -3,6 +3,9 @@
  * أبوسليمان للمحاسبة - نظام إدارة نقاط البيع
  */
 
+// منع تشغيل طبقة التوافق أكثر من مرة
+if (typeof window.CompatibilityManager === 'undefined') {
+
 // التأكد من عدم تضارب المتغيرات العامة
 (function() {
     'use strict';
@@ -240,3 +243,8 @@ window.addEventListener('load', function() {
         return str.toString().replace(/[0-9]/g, (w) => arabicNumbers[+w]);
     });
 });
+
+} // نهاية حماية إعادة تشغيل CompatibilityManager
+else {
+    console.log('ℹ️ CompatibilityManager already loaded, skipping initialization');
+}

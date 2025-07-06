@@ -188,20 +188,37 @@
     <!-- طبقة التوافق -->
     <script src="js/compatibility.js"></script>
 
-    <!-- الملفات القديمة للتوافق (تحميل مشروط) -->
+    <!-- الملفات القديمة للتوافق (تحميل مشروط محسن) -->
     <script>
         // تحميل النظام القديم فقط إذا فشل النظام الجديد
         window.addEventListener('load', function() {
-            if (!window.moduleLoader) {
-                console.warn('تحميل النظام القديم كـ fallback');
-                const oldMainScript = document.createElement('script');
-                oldMainScript.src = 'main.js';
-                document.head.appendChild(oldMainScript);
+            // انتظار قصير للتأكد من تحميل جميع الوحدات
+            setTimeout(function() {
+                if (!window.moduleLoader || !window.Templates) {
+                    console.warn('⚠️ تحميل النظام القديم كـ fallback - النظام الجديد غير متاح');
 
-                const appScript = document.createElement('script');
-                appScript.src = 'app.js';
-                document.head.appendChild(appScript);
-            }
+                    // التحقق من عدم تحميل الملفات مسبقاً
+                    if (!document.querySelector('script[src="main.js"]')) {
+                        const oldMainScript = document.createElement('script');
+                        oldMainScript.src = 'main.js';
+                        oldMainScript.onload = function() {
+                            console.log('📜 Legacy main.js loaded');
+                        };
+                        document.head.appendChild(oldMainScript);
+                    }
+
+                    if (!document.querySelector('script[src="app.js"]')) {
+                        const appScript = document.createElement('script');
+                        appScript.src = 'app.js';
+                        appScript.onload = function() {
+                            console.log('📜 Legacy app.js loaded');
+                        };
+                        document.head.appendChild(appScript);
+                    }
+                } else {
+                    console.log('✅ النظام الجديد يعمل بنجاح - لا حاجة للنظام القديم');
+                }
+            }, 500); // انتظار 500ms للتأكد من التحميل
         });
     </script>
 </body>

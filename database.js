@@ -3,6 +3,9 @@
  * أبوسليمان للمحاسبة - نظام إدارة نقاط البيع
  */
 
+// منع إعادة تعريف فئة Database
+if (typeof Database === 'undefined') {
+
 class Database {
     constructor() {
         this.initializeDatabase();
@@ -494,5 +497,10 @@ class Database {
     }
 }
 
-// إنشاء مثيل من قاعدة البيانات
-const db = new Database();
+} // نهاية حماية إعادة التعريف
+
+// إنشاء مثيل من قاعدة البيانات (مع الحماية من إعادة الإنشاء)
+if (typeof window !== 'undefined' && !window.db) {
+    window.db = new Database();
+    console.log('✅ Database instance created and assigned to window.db');
+}

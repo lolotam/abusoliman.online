@@ -3,8 +3,11 @@
  * أبوسليمان للمحاسبة - نظام إدارة نقاط البيع
  */
 
-// متغيرات عامة (النظام القديم)
-let legacyCurrentSection = 'dashboard';
+// متغيرات عامة (النظام القديم) - مع الحماية من إعادة التعريف
+if (typeof legacyCurrentSection === 'undefined') {
+    var legacyCurrentSection = 'dashboard';
+    console.log('✅ Legacy system variables initialized');
+}
 
 // تهيئة التطبيق عند تحميل الصفحة
 document.addEventListener('DOMContentLoaded', function() {

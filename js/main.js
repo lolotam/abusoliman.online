@@ -297,6 +297,9 @@ let moduleLoader;
 
 document.addEventListener('DOMContentLoaded', () => {
     moduleLoader = new ModuleLoader();
+    // تعيين المرجع العام للتحقق من التحميل
+    window.moduleLoader = moduleLoader;
+    console.log('✅ ModuleLoader assigned to window.moduleLoader');
 });
 
 // تصدير الوظائف للاستخدام العام
