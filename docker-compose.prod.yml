@@ -1,0 +1,183 @@
+version: '3.8'
+
+# ABUSLEMAN POS System - Production Docker Compose
+# نظام أبوسليمان لنقاط البيع - Docker Compose الإنتاجي
+
+services:
+  # Main POS Application
+  abusleman-pos:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NODE_ENV=production
+    image: abusleman-pos:latest
+    container_name: abusleman-pos-prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - NODE_ENV=production
+      - TZ=Asia/Kuwait
+    volumes:
+      # Data persistence
+      - pos_data:/usr/share/nginx/html/data
+      # Logs
+      - pos_logs:/var/log/nginx
+      # SSL certificates (if using HTTPS)
+      - ./ssl:/etc/nginx/ssl:ro
+      # Custom nginx config (optional)
+      - ./docker/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - pos_network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "com.abusleman.service=pos"
+      - "com.abusleman.environment=production"
+
+  # Nginx Load Balancer (for multiple instances)
+  nginx-lb:
+    image: nginx:alpine
+    container_name: nginx-load-balancer
+    restart: always
+    ports:
+      - "8080:80"
+    volumes:
+      - ./docker/nginx-lb.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - abusleman-pos
+    networks:
+      - pos_network
+    profiles:
+      - loadbalancer
+
+  # Backup Service
+  backup:
+    image: alpine:latest
+    container_name: pos-backup-service
+    restart: "no"
+    volumes:
+      - pos_data:/backup/data:ro
+      - ./backups:/backup/output
+    environment:
+      - TZ=Asia/Kuwait
+      - BACKUP_RETENTION_DAYS=30
+    command: >
+      sh -c "
+        apk add --no-cache tar gzip curl &&
+        echo 'Starting backup process...' &&
+        cd /backup &&
+        BACKUP_FILE=output/abusleman-backup-$$(date +%Y%m%d_%H%M%S).tar.gz &&
+        tar -czf $$BACKUP_FILE data/ &&
+        echo 'Backup created: '$$BACKUP_FILE &&
+        find output/ -name '*.tar.gz' -mtime +$$BACKUP_RETENTION_DAYS -delete &&
+        echo 'Old backups cleaned up' &&
+        ls -la output/
+      "
+    networks:
+      - pos_network
+    profiles:
+      - backup
+
+  # Monitoring with Watchtower (Auto-updates)
+  watchtower:
+    image: containrrr/watchtower
+    container_name: pos-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=86400  # 24 hours
+      - WATCHTOWER_INCLUDE_STOPPED=true
+      - TZ=Asia/Kuwait
+    command: abusleman-pos-prod
+    networks:
+      - pos_network
+    profiles:
+      - monitoring
+
+  # Log aggregation with Fluentd
+  fluentd:
+    image: fluent/fluentd:v1.16-debian-1
+    container_name: pos-log-aggregator
+    restart: unless-stopped
+    volumes:
+      - pos_logs:/fluentd/log:ro
+      - ./docker/fluentd.conf:/fluentd/etc/fluent.conf:ro
+    ports:
+      - "24224:24224"
+    environment:
+      - FLUENTD_CONF=fluent.conf
+    networks:
+      - pos_network
+    profiles:
+      - logging
+
+  # Health check service
+  healthcheck:
+    image: alpine:latest
+    container_name: pos-healthcheck
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: >
+      sh -c "
+        apk add --no-cache curl docker-cli &&
+        while true; do
+          if ! curl -f http://abusleman-pos/health >/dev/null 2>&1; then
+            echo 'Health check failed, restarting container...'
+            docker restart abusleman-pos-prod
+          fi
+          sleep 300
+        done
+      "
+    depends_on:
+      - abusleman-pos
+    networks:
+      - pos_network
+    profiles:
+      - monitoring
+
+networks:
+  pos_network:
+    driver: bridge
+    name: abusleman-pos-network
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  pos_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data
+  pos_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./logs
+
+# Secrets (for sensitive data)
+secrets:
+  ssl_cert:
+    file: ./ssl/certificate.crt
+  ssl_key:
+    file: ./ssl/private.key
