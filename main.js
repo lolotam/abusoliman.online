@@ -3,8 +3,8 @@
  * أبوسليمان للمحاسبة - نظام إدارة نقاط البيع
  */
 
-// متغيرات عامة
-let currentSection = 'dashboard';
+// متغيرات عامة (النظام القديم)
+let legacyCurrentSection = 'dashboard';
 
 // تهيئة التطبيق عند تحميل الصفحة
 document.addEventListener('DOMContentLoaded', function() {
@@ -231,8 +231,8 @@ function toggleTheme() {
     showNotification(`تم التبديل إلى الثيم ${newTheme === 'dark' ? 'الداكن' : 'المضيء'}`, 'info');
 }
 
-// عرض قسم معين
-function showSection(sectionName) {
+// عرض قسم معين (النظام القديم)
+function legacyShowSection(sectionName) {
     // إخفاء جميع الأقسام
     const sections = document.querySelectorAll('.content-section');
     sections.forEach(section => {
@@ -249,7 +249,7 @@ function showSection(sectionName) {
     const targetSection = document.getElementById(sectionName);
     if (targetSection) {
         targetSection.classList.add('active');
-        currentSection = sectionName;
+        legacyCurrentSection = sectionName;
         
         // إضافة الفئة النشطة للرابط المناسب
         const activeLink = document.querySelector(`[onclick="showSection('${sectionName}')"]`);

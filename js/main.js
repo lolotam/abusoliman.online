@@ -1,10 +1,10 @@
-// ===== نظام تحميل الوحدات الرئيسي =====
+// ===== نظام تحميل الوحدات الرئيسي المحدث =====
 
 class ModuleLoader {
     constructor() {
         this.loadedModules = new Map();
         this.loadedTemplates = new Map();
-        this.currentSection = 'dashboard';
+        this.currentModuleSection = 'dashboard'; // تغيير الاسم لتجنب التضارب
         this.init();
     }
 
@@ -52,21 +52,31 @@ class ModuleLoader {
         });
     }
 
-    async loadTemplate(templatePath) {
-        if (this.loadedTemplates.has(templatePath)) {
-            return this.loadedTemplates.get(templatePath);
+    async loadTemplate(sectionName) {
+        // استخدام القوالب المدمجة بدلاً من fetch لتجنب مشاكل CORS
+        if (this.loadedTemplates.has(sectionName)) {
+            return this.loadedTemplates.get(sectionName);
         }
 
         try {
-            const response = await fetch(templatePath);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            // التحقق من وجود القالب في Templates المدمجة
+            if (window.Templates && window.Templates[sectionName]) {
+                const html = window.Templates[sectionName];
+                this.loadedTemplates.set(sectionName, html);
+                return html;
+            } else {
+                // قالب افتراضي في حالة عدم وجود القالب
+                const defaultTemplate = `
+                    <div class="section-header">
+                        <h2><i class="fas fa-cog"></i> ${sectionName}</h2>
+                    </div>
+                    <div class="loading">جاري تحميل المحتوى...</div>
+                `;
+                this.loadedTemplates.set(sectionName, defaultTemplate);
+                return defaultTemplate;
             }
-            const html = await response.text();
-            this.loadedTemplates.set(templatePath, html);
-            return html;
         } catch (error) {
-            console.error(`خطأ في تحميل القالب ${templatePath}:`, error);
+            console.error(`خطأ في تحميل القالب ${sectionName}:`, error);
             return `<div class="error">خطأ في تحميل المحتوى</div>`;
         }
     }
@@ -84,7 +94,7 @@ class ModuleLoader {
             // تحميل القسم المطلوب
             await this.loadSection(sectionName);
 
-            this.currentSection = sectionName;
+            this.currentModuleSection = sectionName;
 
         } catch (error) {
             console.error(`خطأ في عرض القسم ${sectionName}:`, error);
@@ -104,9 +114,8 @@ class ModuleLoader {
             contentContainer.appendChild(sectionElement);
         }
 
-        // تحميل القالب
-        const templatePath = `pages/${sectionName}.html`;
-        const templateHtml = await this.loadTemplate(templatePath);
+        // تحميل القالب من Templates المدمجة
+        const templateHtml = await this.loadTemplate(sectionName);
         sectionElement.innerHTML = templateHtml;
 
         // تحميل JavaScript الخاص بالقسم

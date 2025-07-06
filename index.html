@@ -179,11 +179,30 @@
     <script src="database.js"></script>
     <script src="sample-data.js"></script>
 
-    <!-- نظام تحميل الوحدات -->
+    <!-- نظام القوالب المدمجة -->
+    <script src="js/templates.js"></script>
+
+    <!-- نظام تحميل الوحدات الجديد -->
     <script src="js/main.js"></script>
 
-    <!-- الملفات القديمة للتوافق -->
-    <script src="main.js"></script>
-    <script src="app.js"></script>
+    <!-- طبقة التوافق -->
+    <script src="js/compatibility.js"></script>
+
+    <!-- الملفات القديمة للتوافق (تحميل مشروط) -->
+    <script>
+        // تحميل النظام القديم فقط إذا فشل النظام الجديد
+        window.addEventListener('load', function() {
+            if (!window.moduleLoader) {
+                console.warn('تحميل النظام القديم كـ fallback');
+                const oldMainScript = document.createElement('script');
+                oldMainScript.src = 'main.js';
+                document.head.appendChild(oldMainScript);
+
+                const appScript = document.createElement('script');
+                appScript.src = 'app.js';
+                document.head.appendChild(appScript);
+            }
+        });
+    </script>
 </body>
 </html>

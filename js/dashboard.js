@@ -5,13 +5,46 @@
 
 // تهيئة لوحة المعلومات
 function initDashboard() {
-    updateDashboard();
-    
-    // تحديث البيانات كل دقيقة
-    setInterval(updateDateTime, 60000);
-    
-    // تحديث الإحصائيات كل 5 دقائق
-    setInterval(updateStatistics, 300000);
+    try {
+        console.log('🚀 Initializing Dashboard module');
+
+        // التأكد من وجود قاعدة البيانات
+        if (!window.db && window.Database) {
+            window.db = new Database();
+            console.log('📊 Database initialized for dashboard');
+        }
+
+        updateDashboard();
+
+        // تحديث البيانات كل دقيقة
+        setInterval(updateDateTime, 60000);
+
+        // تحديث الإحصائيات كل 5 دقائق
+        setInterval(updateStatistics, 300000);
+
+        console.log('✅ Dashboard module initialized successfully');
+
+    } catch (error) {
+        console.error('❌ Error initializing dashboard:', error);
+
+        // عرض رسالة خطأ للمستخدم
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) {
+            mainContent.innerHTML = `
+                <div class="error-container">
+                    <div class="error-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <h3>خطأ في تحميل لوحة المعلومات</h3>
+                    <p>حدث خطأ أثناء تحميل لوحة المعلومات. يرجى إعادة تحميل الصفحة.</p>
+                    <button class="btn primary" onclick="location.reload()">
+                        <i class="fas fa-refresh"></i>
+                        إعادة تحميل
+                    </button>
+                </div>
+            `;
+        }
+    }
 }
 
 // تحديث لوحة المعلومات
