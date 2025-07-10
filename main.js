@@ -9,9 +9,36 @@ if (typeof legacyCurrentSection === 'undefined') {
     console.log('✅ Legacy system variables initialized');
 }
 
+// معالج الأخطاء العام
+window.addEventListener('error', function(event) {
+    console.error('JavaScript Error:', {
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        error: event.error
+    });
+
+    // عرض رسالة خطأ للمستخدم في حالة الأخطاء الحرجة
+    if (event.error && event.error.name === 'TypeError') {
+        showNotification('حدث خطأ في النظام. يرجى إعادة تحميل الصفحة.', 'error');
+    }
+});
+
+// معالج الأخطاء غير المعالجة
+window.addEventListener('unhandledrejection', function(event) {
+    console.error('Unhandled Promise Rejection:', event.reason);
+    event.preventDefault();
+});
+
 // تهيئة التطبيق عند تحميل الصفحة
 document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
+    try {
+        initializeApp();
+    } catch (error) {
+        console.error('خطأ في تهيئة التطبيق:', error);
+        showNotification('خطأ في تهيئة التطبيق', 'error');
+    }
 });
 
 // تهيئة التطبيق
@@ -44,6 +71,11 @@ function initializeApp() {
 
     // تهيئة الأحداث
     initializeEvents();
+
+    // تهيئة وحدة الفئات المركزية
+    if (typeof initializeCategories === 'function') {
+        initializeCategories();
+    }
 
     // تحديث التاريخ والوقت
     updateCurrentDate();
@@ -218,35 +250,40 @@ function toggleTheme() {
     showNotification(`تم التبديل إلى الثيم ${newTheme === 'dark' ? 'الداكن' : 'المضيء'}`, 'info');
 }
 
-// عرض قسم معين (النظام القديم)
-function legacyShowSection(sectionName) {
+// عرض قسم معين (النظام الحديث)
+function showSection(sectionName) {
     // إخفاء جميع الأقسام
     const sections = document.querySelectorAll('.content-section');
     sections.forEach(section => {
         section.classList.remove('active');
     });
-    
+
     // إزالة الفئة النشطة من جميع الروابط
     const navLinks = document.querySelectorAll('.nav-link');
     navLinks.forEach(link => {
         link.classList.remove('active');
     });
-    
+
     // عرض القسم المطلوب
     const targetSection = document.getElementById(sectionName);
     if (targetSection) {
         targetSection.classList.add('active');
         legacyCurrentSection = sectionName;
-        
+
         // إضافة الفئة النشطة للرابط المناسب
         const activeLink = document.querySelector(`[onclick="showSection('${sectionName}')"]`);
         if (activeLink) {
             activeLink.classList.add('active');
         }
-        
+
         // تحميل محتوى القسم
         loadSectionContent(sectionName);
     }
+}
+
+// عرض قسم معين (النظام القديم - للتوافق مع الكود الموجود)
+function legacyShowSection(sectionName) {
+    showSection(sectionName);
 }
 
 // تحميل محتوى القسم
@@ -627,3 +664,251 @@ function importData(file) {
     };
     reader.readAsText(file);
 }
+
+// ===== وظائف مساعدة للواجهة =====
+
+// تبديل القائمة الجانبية للجوال
+function toggleMobileMenu() {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.querySelector('.mobile-overlay');
+
+    if (sidebar && overlay) {
+        sidebar.classList.toggle('mobile-open');
+        overlay.classList.toggle('active');
+    }
+}
+
+// إغلاق القائمة الجانبية للجوال
+function closeMobileMenu() {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.querySelector('.mobile-overlay');
+
+    if (sidebar && overlay) {
+        sidebar.classList.remove('mobile-open');
+        overlay.classList.remove('active');
+    }
+}
+
+// وظائف placeholder للأزرار التي لم يتم تطويرها بعد
+function showLowStockDetails() {
+    showNotification('هذه الميزة قيد التطوير', 'info');
+}
+
+function showAddInvoiceModal() {
+    showNotification('هذه الميزة قيد التطوير', 'info');
+}
+
+function showRecentTransactions() {
+    showNotification('هذه الميزة قيد التطوير', 'info');
+}
+
+function showAddProductModal() {
+    if (typeof loadProductsSection === 'function') {
+        showSection('products');
+        setTimeout(() => {
+            // محاولة استدعاء وظيفة إضافة المنتج من app.js
+            if (typeof window.showAddProductModal === 'function') {
+                window.showAddProductModal();
+            } else {
+                showNotification('هذه الميزة قيد التطوير', 'info');
+            }
+        }, 100);
+    } else {
+        showNotification('هذه الميزة قيد التطوير', 'info');
+    }
+}
+
+function showAddCustomerModal() {
+    showNotification('هذه الميزة قيد التطوير', 'info');
+}
+
+function showPaymentCollection() {
+    showNotification('هذه الميزة قيد التطوير', 'info');
+}
+
+function showCustomerStatements() {
+    showNotification('هذه الميزة قيد التطوير', 'info');
+}
+
+function showAddSupplierModal() {
+    showNotification('هذه الميزة قيد التطوير', 'info');
+}
+
+function showAddPurchaseModal() {
+    showNotification('هذه الميزة قيد التطوير', 'info');
+}
+
+function showSupplierPayments() {
+    showNotification('هذه الميزة قيد التطوير', 'info');
+}
+
+function showStockTransfer() {
+    showNotification('هذه الميزة قيد التطوير', 'info');
+}
+
+function showInventoryAdjustment() {
+    showNotification('هذه الميزة قيد التطوير', 'info');
+}
+
+function showMovementHistory() {
+    showNotification('هذه الميزة قيد التطوير', 'info');
+}
+
+function showDailySalesReport() {
+    showNotification('هذه الميزة قيد التطوير', 'info');
+}
+
+function showInventoryReport() {
+    showNotification('هذه الميزة قيد التطوير', 'info');
+}
+
+function showFinancialSummary() {
+    showNotification('هذه الميزة قيد التطوير', 'info');
+}
+
+// اختبار التكامل الشامل للنظام
+function runComprehensiveSystemTest() {
+    try {
+        console.log('🚀 بدء اختبار التكامل الشامل للنظام...');
+        console.log('=' .repeat(50));
+
+        let totalTests = 0;
+        let passedTests = 0;
+        const testResults = [];
+
+        // اختبار 1: تكامل الفئات
+        console.log('\n📂 اختبار تكامل الفئات...');
+        if (typeof testCategoryIntegration === 'function') {
+            totalTests++;
+            try {
+                const result = testCategoryIntegration();
+                if (result) {
+                    passedTests++;
+                    testResults.push('✅ تكامل الفئات: نجح');
+                } else {
+                    testResults.push('❌ تكامل الفئات: فشل');
+                }
+            } catch (error) {
+                testResults.push('❌ تكامل الفئات: خطأ - ' + error.message);
+            }
+        } else {
+            testResults.push('⚠️ تكامل الفئات: الدالة غير متاحة');
+        }
+
+        // اختبار 2: تقرير المخزون المحسن
+        console.log('\n📊 اختبار تقرير المخزون المحسن...');
+        if (typeof testEnhancedInventoryReport === 'function') {
+            totalTests++;
+            try {
+                const result = testEnhancedInventoryReport();
+                if (result) {
+                    passedTests++;
+                    testResults.push('✅ تقرير المخزون المحسن: نجح');
+                } else {
+                    testResults.push('❌ تقرير المخزون المحسن: فشل');
+                }
+            } catch (error) {
+                testResults.push('❌ تقرير المخزون المحسن: خطأ - ' + error.message);
+            }
+        } else {
+            testResults.push('⚠️ تقرير المخزون المحسن: الدالة غير متاحة');
+        }
+
+        // اختبار 3: تخطيط بطاقات المنتجات
+        console.log('\n🛍️ اختبار تخطيط بطاقات المنتجات...');
+        if (typeof testNewProductCardLayout === 'function') {
+            totalTests++;
+            try {
+                const result = testNewProductCardLayout();
+                if (result) {
+                    passedTests++;
+                    testResults.push('✅ تخطيط بطاقات المنتجات: نجح');
+                } else {
+                    testResults.push('❌ تخطيط بطاقات المنتجات: فشل');
+                }
+            } catch (error) {
+                testResults.push('❌ تخطيط بطاقات المنتجات: خطأ - ' + error.message);
+            }
+        } else {
+            testResults.push('⚠️ تخطيط بطاقات المنتجات: الدالة غير متاحة');
+        }
+
+        // اختبار 4: قاعدة البيانات
+        console.log('\n💾 اختبار قاعدة البيانات...');
+        totalTests++;
+        try {
+            if (window.db) {
+                const products = db.getTable('products');
+                const categories = db.getTable('categories');
+                const warehouses = db.getTable('warehouses');
+                const customers = db.getTable('customers');
+                const suppliers = db.getTable('suppliers');
+
+                if (products && categories && warehouses && customers && suppliers) {
+                    passedTests++;
+                    testResults.push(`✅ قاعدة البيانات: نجح (${products.length} منتج، ${categories.length} فئة، ${warehouses.length} مخزن)`);
+                } else {
+                    testResults.push('❌ قاعدة البيانات: جداول مفقودة');
+                }
+            } else {
+                testResults.push('❌ قاعدة البيانات: غير متاحة');
+            }
+        } catch (error) {
+            testResults.push('❌ قاعدة البيانات: خطأ - ' + error.message);
+        }
+
+        // اختبار 5: واجهة المستخدم
+        console.log('\n🎨 اختبار واجهة المستخدم...');
+        totalTests++;
+        try {
+            const sections = ['dashboard', 'sales', 'products', 'reports', 'settings'];
+            const missingSections = sections.filter(section => !document.getElementById(section));
+
+            if (missingSections.length === 0) {
+                passedTests++;
+                testResults.push('✅ واجهة المستخدم: جميع الأقسام موجودة');
+            } else {
+                testResults.push(`❌ واجهة المستخدم: أقسام مفقودة - ${missingSections.join(', ')}`);
+            }
+        } catch (error) {
+            testResults.push('❌ واجهة المستخدم: خطأ - ' + error.message);
+        }
+
+        // النتائج النهائية
+        console.log('\n' + '=' .repeat(50));
+        console.log('📋 تقرير اختبار التكامل الشامل:');
+        console.log('=' .repeat(50));
+
+        testResults.forEach(result => console.log(result));
+
+        const successRate = totalTests > 0 ? (passedTests / totalTests) * 100 : 0;
+        console.log(`\n🎯 النتيجة النهائية: ${passedTests}/${totalTests} (${successRate.toFixed(1)}%)`);
+
+        if (successRate >= 90) {
+            console.log('🎉 النظام يعمل بشكل ممتاز!');
+            showNotification('اختبار التكامل الشامل نجح بامتياز', 'success');
+        } else if (successRate >= 70) {
+            console.log('✅ النظام يعمل بشكل جيد مع بعض التحسينات المطلوبة');
+            showNotification('اختبار التكامل نجح مع بعض التحذيرات', 'info');
+        } else {
+            console.log('⚠️ النظام يحتاج إلى تحسينات');
+            showNotification('اختبار التكامل يظهر مشاكل تحتاج إصلاح', 'warning');
+        }
+
+        console.log('=' .repeat(50));
+        return successRate >= 70;
+
+    } catch (error) {
+        console.error('❌ خطأ في اختبار التكامل الشامل:', error);
+        showNotification('خطأ في اختبار التكامل الشامل', 'error');
+        return false;
+    }
+}
+
+// تصدير الوظائف للاستخدام العام
+window.showSection = showSection;
+window.showNotification = showNotification;
+window.formatCurrency = formatCurrency;
+window.toArabicNumbers = toArabicNumbers;
+window.initializeApp = initializeApp;
+window.runComprehensiveSystemTest = runComprehensiveSystemTest;

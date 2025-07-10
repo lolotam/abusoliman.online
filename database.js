@@ -5,7 +5,6 @@
 
 // منع إعادة تعريف فئة Database
 if (typeof Database === 'undefined') {
-    console.log('🔧 Defining Database class...');
 
 class Database {
     constructor() {
@@ -33,8 +32,6 @@ class Database {
 
             // التحقق من سلامة البيانات وإصلاحها إذا لزم الأمر
             this.validateAndRepairData();
-
-            console.log('تم تهيئة قاعدة البيانات بنجاح');
         } catch (error) {
             console.error('خطأ في تهيئة قاعدة البيانات:', error);
             this.repairDatabase();
@@ -48,12 +45,11 @@ class Database {
 
             // إصلاح إعدادات النظام إذا كانت تالفة
             if (!settings || typeof settings !== 'object' || !settings.initialized) {
-                console.log('إصلاح إعدادات النظام...');
                 this.setTable('settings', {
                     companyName: 'أبوسليمان للمحاسبة',
-                    companyAddress: 'الكويت - حولي - شارع تونس',
-                    companyPhone: '+965 2262 5555',
-                    companyEmail: 'info@abusleman.com.kw',
+                    companyAddress: 'الكويت - الفروانية - الجليب',
+                    companyPhone: '+965 55683677',
+                    companyEmail: 'info@abusoliman.com',
                     taxRate: 0,
                     currency: 'د.ك',
                     password: this.hashPassword('123'),
@@ -66,7 +62,6 @@ class Database {
 
             // التحقق من كلمة المرور وإصلاحها إذا لزم الأمر
             if (settings && !this.verifyPassword('123', settings.password)) {
-                console.log('إصلاح كلمة المرور...');
                 const updatedSettings = { ...settings, password: this.hashPassword('123') };
                 this.setTable('settings', updatedSettings);
             }
@@ -80,7 +75,6 @@ class Database {
     // إصلاح قاعدة البيانات في حالة التلف
     repairDatabase() {
         try {
-            console.log('بدء إصلاح قاعدة البيانات...');
 
             // مسح البيانات التالفة
             const corruptedTables = ['settings'];
@@ -91,9 +85,9 @@ class Database {
             // إعادة تهيئة الجداول الأساسية
             this.createTable('settings', {
                 companyName: 'أبوسليمان للمحاسبة',
-                companyAddress: 'الكويت - حولي - شارع تونس',
-                companyPhone: '+965 2262 5555',
-                companyEmail: 'info@abusleman.com.kw',
+                companyAddress: 'الكويت - الجليب - الشارع الرئيسي',
+                companyPhone: '+965 55683688',
+                companyEmail: 'info@abusoliman.com',
                 taxRate: 0,
                 currency: 'د.ك',
                 password: this.hashPassword('123'),
@@ -102,8 +96,6 @@ class Database {
                 initialized: true,
                 version: '1.0'
             });
-
-            console.log('تم إصلاح قاعدة البيانات بنجاح');
         } catch (error) {
             console.error('فشل في إصلاح قاعدة البيانات:', error);
             alert('خطأ في قاعدة البيانات. يرجى مسح بيانات المتصفح وإعادة تحميل الصفحة.');
@@ -130,12 +122,22 @@ class Database {
             this.createTable('purchases', []);
             this.createTable('payments', []);
             this.createTable('categories', [
-                { id: 'general', name: 'عام', description: 'فئة عامة' },
-                { id: 'electronics', name: 'إلكترونيات', description: 'أجهزة إلكترونية ومعدات' },
-                { id: 'clothing', name: 'ملابس', description: 'ملابس وأزياء' },
-                { id: 'food', name: 'مواد غذائية', description: 'مواد غذائية ومشروبات' },
-                { id: 'home', name: 'أدوات منزلية', description: 'أدوات وأجهزة منزلية' },
-                { id: 'books', name: 'كتب ومكتبة', description: 'كتب وقرطاسية' }
+                { id: 'general', name: 'عام', description: 'فئة عامة للمنتجات المتنوعة' },
+                { id: 'electronics', name: 'إلكترونيات', description: 'أجهزة إلكترونية ومعدات تقنية وملحقاتها' },
+                { id: 'clothing', name: 'ملابس وأزياء', description: 'ملابس رجالية ونسائية وأطفال وإكسسوارات' },
+                { id: 'food', name: 'أغذية ومشروبات', description: 'مواد غذائية ومشروبات ومنتجات طازجة' },
+                { id: 'cosmetics', name: 'مستحضرات التجميل', description: 'منتجات العناية بالبشرة والشعر ومستحضرات التجميل' },
+                { id: 'home', name: 'أدوات منزلية', description: 'أدوات المطبخ والتنظيف والديكور المنزلي' },
+                { id: 'books', name: 'كتب وقرطاسية', description: 'كتب ومجلات وأدوات مكتبية وقرطاسية' },
+                { id: 'toys', name: 'ألعاب وترفيه', description: 'ألعاب الأطفال وألعاب الفيديو ووسائل الترفيه' },
+                { id: 'sports', name: 'رياضة ولياقة', description: 'معدات رياضية وملابس رياضية ومكملات غذائية' },
+                { id: 'automotive', name: 'سيارات ومركبات', description: 'قطع غيار السيارات وإكسسوارات المركبات' },
+                { id: 'health', name: 'صحة وطب', description: 'أدوية ومعدات طبية ومنتجات صحية' },
+                { id: 'furniture', name: 'أثاث وديكور', description: 'أثاث منزلي ومكتبي وقطع ديكور' },
+                { id: 'garden', name: 'حدائق ونباتات', description: 'نباتات وأدوات زراعة ومعدات الحدائق' },
+                { id: 'baby', name: 'أطفال ورضع', description: 'منتجات الأطفال والرضع وملابس الأطفال' },
+                { id: 'jewelry', name: 'مجوهرات وساعات', description: 'مجوهرات وساعات وإكسسوارات ثمينة' },
+                { id: 'crafts', name: 'حرف وهوايات', description: 'أدوات الحرف اليدوية ومستلزمات الهوايات' }
             ]);
 
             this.createTable('warehouses', [
@@ -146,7 +148,8 @@ class Database {
 
             this.createTable('inventory_movements', []);
 
-            console.log('تم إكمال تهيئة جميع الجداول بنجاح');
+            // تشغيل ترقية أرقام الفواتير
+            this.migrateInvoiceNumbers();
         } catch (error) {
             console.error('خطأ في إكمال تهيئة الجداول:', error);
         }
@@ -185,21 +188,50 @@ class Database {
     insert(tableName, item) {
         try {
             const table = this.getTable(tableName);
-            
+
             // إضافة معرف فريد إذا لم يكن موجوداً
             if (!item.id) {
                 item.id = this.generateId();
             }
-            
+
             // إضافة تاريخ الإنشاء
             if (!item.createdAt) {
                 item.createdAt = new Date().toISOString();
             }
-            
+
             table.push(item);
             return this.setTable(tableName, table) ? item : null;
         } catch (error) {
             console.error(`خطأ في إضافة عنصر إلى ${tableName}:`, error);
+            return null;
+        }
+    }
+
+    // إضافة سجل جديد (اسم بديل للتوافق)
+    addRecord(tableName, item) {
+        return this.insert(tableName, item);
+    }
+
+    // تحديث سجل موجود (اسم بديل للتوافق)
+    updateRecord(tableName, item) {
+        try {
+            if (!item.id) {
+                console.error('معرف العنصر مطلوب للتحديث');
+                return null;
+            }
+
+            const table = this.getTable(tableName);
+            const index = table.findIndex(record => record.id === item.id);
+
+            if (index !== -1) {
+                table[index] = { ...item, updatedAt: new Date().toISOString() };
+                return this.setTable(tableName, table) ? table[index] : null;
+            }
+
+            console.error('السجل غير موجود');
+            return null;
+        } catch (error) {
+            console.error(`خطأ في تحديث سجل في ${tableName}:`, error);
             return null;
         }
     }
@@ -274,7 +306,7 @@ class Database {
 
     // توليد معرف فريد
     generateId() {
-        return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        return Date.now().toString(36) + Math.random().toString(36).substring(2);
     }
 
     // تشفير كلمة المرور
@@ -340,6 +372,222 @@ class Database {
         return this.toArabicNumbers(formatted);
     }
 
+    // توليد رقم فاتورة جديد
+    generateInvoiceNumber(type) {
+        try {
+            const prefix = type === 'sale' ? 'ABUSLEAN-SALE-' : 'ABUSLEAN-PUR-';
+            const counterKey = type === 'sale' ? 'saleInvoiceCounter' : 'purchaseInvoiceCounter';
+
+            // الحصول على الإعدادات
+            let settings = this.getTable('settings');
+
+            // تهيئة العداد إذا لم يكن موجوداً
+            if (!settings[counterKey]) {
+                settings[counterKey] = 0;
+            }
+
+            // زيادة العداد
+            settings[counterKey]++;
+
+            // تحديث الإعدادات
+            this.setTable('settings', settings);
+
+            // إنشاء رقم الفاتورة مع zero-padding
+            const invoiceNumber = prefix + String(settings[counterKey]).padStart(2, '0');
+
+            return invoiceNumber;
+        } catch (error) {
+            console.error('خطأ في توليد رقم الفاتورة:', error);
+            return null;
+        }
+    }
+
+    // تحديث أرقام الفواتير الموجودة
+    updateExistingInvoiceNumbers() {
+        try {
+            // تحديث فواتير المبيعات
+            const sales = this.getTable('sales');
+            let saleCounter = 0;
+
+            // ترتيب الفواتير حسب تاريخ الإنشاء
+            sales.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+            sales.forEach((sale, index) => {
+                if (!sale.invoiceNumber || !sale.invoiceNumber.startsWith('ABUSLEAN-SALE-')) {
+                    saleCounter++;
+                    sale.invoiceNumber = 'ABUSLEAN-SALE-' + String(saleCounter).padStart(2, '0');
+                }
+            });
+
+            // حفظ فواتير المبيعات المحدثة
+            this.setTable('sales', sales);
+
+            // تحديث فواتير المشتريات
+            const purchases = this.getTable('purchases');
+            let purchaseCounter = 0;
+
+            // ترتيب الفواتير حسب تاريخ الإنشاء
+            purchases.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+            purchases.forEach((purchase, index) => {
+                if (!purchase.invoiceNumber || !purchase.invoiceNumber.startsWith('ABUSLEAN-PUR-')) {
+                    purchaseCounter++;
+                    purchase.invoiceNumber = 'ABUSLEAN-PUR-' + String(purchaseCounter).padStart(2, '0');
+                }
+            });
+
+            // حفظ فواتير المشتريات المحدثة
+            this.setTable('purchases', purchases);
+
+            // تحديث العدادات في الإعدادات
+            let settings = this.getTable('settings');
+            settings.saleInvoiceCounter = saleCounter;
+            settings.purchaseInvoiceCounter = purchaseCounter;
+            this.setTable('settings', settings);
+
+            return { salesUpdated: saleCounter, purchasesUpdated: purchaseCounter };
+        } catch (error) {
+            console.error('خطأ في تحديث أرقام الفواتير:', error);
+            return null;
+        }
+    }
+
+    // تشغيل ترقية أرقام الفواتير تلقائياً عند التهيئة
+    migrateInvoiceNumbers() {
+        try {
+            const settings = this.getTable('settings');
+
+            // التحقق من أن الترقية لم تتم من قبل
+            if (!settings.invoiceNumbersMigrated) {
+                console.log('بدء ترقية أرقام الفواتير...');
+                const result = this.updateExistingInvoiceNumbers();
+
+                if (result) {
+                    // تسجيل أن الترقية تمت
+                    settings.invoiceNumbersMigrated = true;
+                    this.setTable('settings', settings);
+
+                    console.log(`تم ترقية ${result.salesUpdated} فاتورة مبيعات و ${result.purchasesUpdated} فاتورة شراء`);
+                    return result;
+                }
+            }
+
+            return null;
+        } catch (error) {
+            console.error('خطأ في ترقية أرقام الفواتير:', error);
+            return null;
+        }
+    }
+
+    // اختبار نظام ترقيم الفواتير
+    testInvoiceNumbering() {
+        try {
+            console.log('اختبار نظام ترقيم الفواتير...');
+
+            // اختبار توليد أرقام فواتير المبيعات
+            const saleNumber1 = this.generateInvoiceNumber('sale');
+            const saleNumber2 = this.generateInvoiceNumber('sale');
+            const saleNumber3 = this.generateInvoiceNumber('sale');
+
+            console.log('أرقام فواتير المبيعات:', saleNumber1, saleNumber2, saleNumber3);
+
+            // اختبار توليد أرقام فواتير المشتريات
+            const purchaseNumber1 = this.generateInvoiceNumber('purchase');
+            const purchaseNumber2 = this.generateInvoiceNumber('purchase');
+            const purchaseNumber3 = this.generateInvoiceNumber('purchase');
+
+            console.log('أرقام فواتير المشتريات:', purchaseNumber1, purchaseNumber2, purchaseNumber3);
+
+            // التحقق من التسلسل الصحيح
+            const expectedSale1 = /ABUSLEAN-SALE-\d{2}/.test(saleNumber1);
+            const expectedPurchase1 = /ABUSLEAN-PUR-\d{2}/.test(purchaseNumber1);
+
+            if (expectedSale1 && expectedPurchase1) {
+                console.log('✅ نظام ترقيم الفواتير يعمل بشكل صحيح');
+                return true;
+            } else {
+                console.log('❌ خطأ في نظام ترقيم الفواتير');
+                return false;
+            }
+
+        } catch (error) {
+            console.error('خطأ في اختبار نظام ترقيم الفواتير:', error);
+            return false;
+        }
+    }
+
+    // التحقق من تفرد رقم الفاتورة
+    isInvoiceNumberUnique(invoiceNumber, type, excludeId = null) {
+        try {
+            const tableName = type === 'sale' ? 'sales' : 'purchases';
+            const records = this.getTable(tableName);
+
+            return !records.some(record =>
+                record.invoiceNumber === invoiceNumber && record.id !== excludeId
+            );
+        } catch (error) {
+            console.error('خطأ في التحقق من تفرد رقم الفاتورة:', error);
+            return false;
+        }
+    }
+
+    // تحديث رقم فاتورة موجودة
+    updateInvoiceNumber(recordId, newInvoiceNumber, type) {
+        try {
+            const tableName = type === 'sale' ? 'sales' : 'purchases';
+            const records = this.getTable(tableName);
+            const recordIndex = records.findIndex(r => r.id === recordId);
+
+            if (recordIndex === -1) {
+                console.error('السجل غير موجود');
+                return false;
+            }
+
+            // التحقق من تفرد الرقم الجديد
+            if (!this.isInvoiceNumberUnique(newInvoiceNumber, type, recordId)) {
+                console.error('رقم الفاتورة موجود مسبقاً');
+                return false;
+            }
+
+            // تحديث رقم الفاتورة
+            records[recordIndex].invoiceNumber = newInvoiceNumber;
+            this.setTable(tableName, records);
+
+            console.log(`تم تحديث رقم الفاتورة إلى: ${newInvoiceNumber}`);
+            return true;
+
+        } catch (error) {
+            console.error('خطأ في تحديث رقم الفاتورة:', error);
+            return false;
+        }
+    }
+
+    // التحقق من صحة تنسيق رقم الفاتورة
+    validateInvoiceNumberFormat(invoiceNumber, type) {
+        try {
+            const prefix = type === 'sale' ? 'ABUSLEAN-SALE-' : 'ABUSLEAN-PUR-';
+            const pattern = new RegExp(`^${prefix.replace('-', '\\-')}\\d{2,}$`);
+
+            return pattern.test(invoiceNumber);
+        } catch (error) {
+            console.error('خطأ في التحقق من تنسيق رقم الفاتورة:', error);
+            return false;
+        }
+    }
+
+    // إنشاء رقم فاتورة من الرقم المدخل
+    createInvoiceNumberFromInput(numberInput, type) {
+        try {
+            const prefix = type === 'sale' ? 'ABUSLEAN-SALE-' : 'ABUSLEAN-PUR-';
+            const paddedNumber = String(numberInput).padStart(2, '0');
+
+            return prefix + paddedNumber;
+        } catch (error) {
+            console.error('خطأ في إنشاء رقم الفاتورة:', error);
+            return null;
+        }
+    }
+
     // تصدير البيانات
     exportData() {
         try {
@@ -352,10 +600,12 @@ class Database {
                 purchases: this.getTable('purchases'),
                 payments: this.getTable('payments'),
                 categories: this.getTable('categories'),
+                warehouses: this.getTable('warehouses'),
+                inventory_movements: this.getTable('inventory_movements'),
                 exportDate: new Date().toISOString(),
                 version: '1.0'
             };
-            
+
             return JSON.stringify(data, null, 2);
         } catch (error) {
             console.error('خطأ في تصدير البيانات:', error);
@@ -412,8 +662,6 @@ class Database {
 
             // إنشاء نسخة احتياطية دورية
             this.createBackup();
-
-            console.log('تم الحفظ التلقائي:', new Date().toLocaleString('ar-SA'));
         } catch (error) {
             console.error('خطأ في الحفظ التلقائي:', error);
         }
@@ -479,8 +727,6 @@ class Database {
             const backup = JSON.parse(backupData);
             this.data = backup.data;
             this.save();
-
-            console.log('تم استعادة البيانات من النسخة الاحتياطية');
             return true;
         } catch (error) {
             console.error('خطأ في استعادة النسخة الاحتياطية:', error);
@@ -535,37 +781,79 @@ class Database {
 
             const totalSalesToday = todaySales.reduce((sum, sale) => sum + sale.total, 0);
 
-            // منتجات منخفضة المخزون (فحص كل مخزن)
+            // منتجات منخفضة المخزون
             const lowStockProducts = [];
             const lowStockDetails = [];
+            const processedProducts = new Set(); // لتجنب التكرار
 
             products.forEach(product => {
-                warehouses.forEach(warehouse => {
-                    const qty = product.warehouses?.[warehouse.id] || 0;
-                    const threshold = product.minQuantity || lowStockThreshold;
+                const threshold = product.minStock || lowStockThreshold;
+                let hasLowStock = false;
 
-                    if (qty <= threshold && qty >= 0) {
-                        const existingProduct = lowStockProducts.find(p => p.id === product.id);
-                        if (!existingProduct) {
-                            lowStockProducts.push({
-                                id: product.id,
-                                name: product.name,
-                                totalQuantity: Object.values(product.warehouses || {}).reduce((sum, q) => sum + q, 0),
-                                threshold: threshold
+                // تحديث الكمية الإجمالية بناءً على توزيع المخازن
+                if (product.warehouseDistribution && warehouses.length > 0) {
+                    // حساب الكمية الإجمالية من توزيع المخازن
+                    const calculatedTotal = Object.values(product.warehouseDistribution).reduce((sum, qty) => sum + (qty || 0), 0);
+                    product.quantity = calculatedTotal;
+
+                    // فحص كل مخزن نشط للمنتج
+                    warehouses.forEach(warehouse => {
+                        const warehouseQty = product.warehouseDistribution[warehouse.id] || 0;
+
+                        // فحص إذا كان المنتج منخفض المخزون في هذا المخزن
+                        if (warehouseQty <= threshold) {
+                            hasLowStock = true;
+
+                            lowStockDetails.push({
+                                productId: product.id,
+                                productName: product.name,
+                                warehouseId: warehouse.id,
+                                warehouseName: warehouse.name,
+                                quantity: warehouseQty,
+                                threshold: threshold,
+                                status: warehouseQty === 0 ? 'out-of-stock' : 'low-stock'
                             });
                         }
+                    });
+                } else {
+                    // إذا لم تكن هناك توزيعات مخازن، فحص الكمية الإجمالية
+                    const totalQuantity = product.quantity || 0;
+
+                    if (totalQuantity <= threshold) {
+                        hasLowStock = true;
 
                         lowStockDetails.push({
                             productId: product.id,
                             productName: product.name,
-                            warehouseId: warehouse.id,
-                            warehouseName: warehouse.name,
-                            quantity: qty,
+                            warehouseId: 'main',
+                            warehouseName: 'المخزن الرئيسي',
+                            quantity: totalQuantity,
                             threshold: threshold,
-                            status: qty === 0 ? 'out-of-stock' : 'low-stock'
+                            status: totalQuantity === 0 ? 'out-of-stock' : 'low-stock'
                         });
                     }
-                });
+                }
+
+                // إضافة المنتج لقائمة المنتجات منخفضة المخزون (مرة واحدة فقط)
+                if (hasLowStock && !processedProducts.has(product.id)) {
+                    processedProducts.add(product.id);
+
+                    // حساب الكمية الإجمالية
+                    let totalQuantity = 0;
+                    if (product.warehouseDistribution && warehouses.length > 0) {
+                        totalQuantity = Object.values(product.warehouseDistribution).reduce((sum, qty) => sum + (qty || 0), 0);
+                    } else {
+                        totalQuantity = product.quantity || 0;
+                    }
+
+                    lowStockProducts.push({
+                        id: product.id,
+                        name: product.name,
+                        totalQuantity: totalQuantity,
+                        threshold: threshold,
+                        status: totalQuantity === 0 ? 'out-of-stock' : 'low-stock'
+                    });
+                }
             });
 
             return {
@@ -594,20 +882,16 @@ class Database {
 
 // تصدير فئة Database للنطاق العام
 window.Database = Database;
-console.log('✅ Database class exported to global scope');
 
 // إنشاء مثيل من قاعدة البيانات داخل نطاق الحماية
 if (typeof window !== 'undefined' && !window.db) {
     window.db = new Database();
-    console.log('✅ Database instance created and assigned to window.db');
 }
 
 } // نهاية حماية إعادة التعريف
 else {
-    console.log('ℹ️ Database class already defined, skipping redefinition');
     // إنشاء مثيل إذا لم يكن موجوداً
     if (typeof window !== 'undefined' && !window.db) {
         window.db = new Database();
-        console.log('✅ Database instance created from existing class');
     }
 }

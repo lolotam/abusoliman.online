@@ -1,0 +1,31 @@
+{
+  "name": "abusleman-inventory-system",
+  "version": "1.0.0",
+  "description": "نظام إدارة المخزون والمحاسبة - أبوسليمان",
+  "main": "index.html",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:inventory": "playwright test test-inventory-categories.js",
+    "test:ui": "playwright test --ui",
+    "install-browsers": "playwright install",
+    "serve": "python -m http.server 3000",
+    "start": "python -m http.server 3000"
+  },
+  "keywords": [
+    "inventory",
+    "pos",
+    "accounting",
+    "arabic",
+    "warehouse"
+  ],
+  "author": "أبوسليمان للمحاسبة",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

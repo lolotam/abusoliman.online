@@ -43,15 +43,11 @@ function createDefaultAdmin() {
 
             users.push(defaultAdmin);
             db.setTable('users', users);
-            console.log('تم إنشاء المستخدم الافتراضي: admin / 123');
-        } else {
-            console.log('المستخدم الافتراضي موجود بالفعل');
         }
 
         // التأكد من أن كلمة المرور صحيحة
         const admin = users.find(user => user.username === 'admin');
         if (admin && !verifyPassword('123', admin.password)) {
-            console.log('إصلاح كلمة مرور المدير...');
             admin.password = hashPassword('123');
             db.setTable('users', users);
         }
@@ -71,7 +67,6 @@ function createDefaultAdmin() {
             lastLogin: null
         }];
         db.setTable('users', defaultUsers);
-        console.log('تم إنشاء مستخدم افتراضي جديد بعد الخطأ');
     }
 }
 
@@ -116,7 +111,6 @@ function login(event) {
                     isActive: true,
                     lastLogin: new Date().toISOString()
                 };
-                console.log('تم تسجيل الدخول بالنظام القديم');
             }
         }
 
@@ -153,7 +147,6 @@ function login(event) {
             initializeSystem();
         }
 
-        console.log('تم تسجيل الدخول بنجاح:', user.fullName);
         showNotification('مرحباً ' + user.fullName, 'success');
 
     } catch (error) {
@@ -221,15 +214,11 @@ function checkSession() {
                 document.getElementById('loginScreen').classList.add('hidden');
                 document.getElementById('mainApp').classList.remove('hidden');
                 updateUserDisplay();
-                console.log('تم استعادة الجلسة للمستخدم:', currentUser.fullName);
                 return true;
             } else {
                 // المستخدم غير موجود أو غير نشط
-                console.log('الجلسة غير صالحة، تسجيل خروج تلقائي');
                 logout();
             }
-        } else {
-            console.log('لا توجد جلسة محفوظة');
         }
     } catch (error) {
         console.error('خطأ في قراءة بيانات الجلسة:', error);
@@ -698,6 +687,22 @@ function loadProductsSection() {
                     <i class="fas fa-plus"></i>
                     إضافة منتج جديد
                 </button>
+                <button class="btn btn-success" onclick="exportProductsToCSV()" title="تصدير جميع المنتجات إلى ملف CSV">
+                    <i class="fas fa-download"></i>
+                    تصدير
+                </button>
+                <button class="btn btn-info" onclick="showImportProductsModal()" title="استيراد المنتجات من ملف CSV">
+                    <i class="fas fa-upload"></i>
+                    استيراد
+                </button>
+                <button class="btn btn-warning" onclick="downloadProductsTemplate()" title="تحميل قالب CSV لإدخال المنتجات">
+                    <i class="fas fa-file-csv"></i>
+                    قالب
+                </button>
+                <button class="btn btn-purple" onclick="exportAllDataToZip()" title="تصدير جميع البيانات في ملف ZIP">
+                    <i class="fas fa-archive"></i>
+                    تصدير شامل
+                </button>
                 <button class="btn btn-secondary" onclick="completeProductData()" title="إكمال البيانات الناقصة للمنتجات">
                     <i class="fas fa-database"></i>
                     إكمال البيانات
@@ -844,7 +849,6 @@ function loadCategories() {
         const categories = db.getTable('categories');
 
         if (categories.length === 0) {
-            console.log('لا توجد فئات في قاعدة البيانات');
             return;
         }
 
@@ -862,11 +866,8 @@ function loadCategories() {
                     categories.map(category =>
                         `<option value="${category.id}">${category.name}</option>`
                     ).join('');
-                console.log(`تم تحميل الفئات في ${selectorId}`);
             }
         });
-
-        console.log(`تم تحميل ${categories.length} فئة بنجاح`);
 
     } catch (error) {
         console.error('خطأ في تحميل الفئات:', error);
@@ -1123,7 +1124,6 @@ function completeProductData() {
         const purchases = db.getTable('purchases');
 
         if (products.length === 0 || suppliers.length === 0) {
-            console.log('لا توجد منتجات أو موردين لإكمال البيانات');
             return;
         }
 
@@ -1206,20 +1206,1863 @@ function completeProductData() {
         });
 
         if (updatedCount > 0) {
-            console.log(`تم إكمال بيانات ${updatedCount} منتج بنجاح`);
             showNotification(`تم إكمال بيانات ${updatedCount} منتج بنجاح`, 'success');
 
             // إعادة تحميل المنتجات
             if (typeof loadProducts === 'function') {
                 loadProducts();
             }
-        } else {
-            console.log('جميع المنتجات تحتوي على بيانات كاملة');
         }
 
     } catch (error) {
         console.error('خطأ في إكمال بيانات المنتجات:', error);
         showNotification('خطأ في إكمال بيانات المنتجات', 'error');
+    }
+}
+
+// ===== وظائف تصدير واستيراد المنتجات =====
+
+// تصدير المنتجات إلى ملف CSV
+function exportProductsToCSV() {
+    try {
+        if (!window.db) {
+            showNotification('قاعدة البيانات غير متاحة', 'error');
+            return;
+        }
+
+        const products = db.getTable('products');
+        const suppliers = db.getTable('suppliers');
+        const warehouses = db.getTable('warehouses');
+
+        if (products.length === 0) {
+            showNotification('لا توجد منتجات للتصدير', 'warning');
+            return;
+        }
+
+        // إنشاء خريطة للموردين والمخازن للبحث السريع
+        const suppliersMap = {};
+        suppliers.forEach(supplier => {
+            suppliersMap[supplier.id] = supplier.name;
+        });
+
+        const warehousesMap = {};
+        warehouses.forEach(warehouse => {
+            warehousesMap[warehouse.id] = warehouse.name;
+        });
+
+        // تحضير البيانات للتصدير
+        const csvData = [];
+
+        // إضافة الرؤوس باللغة العربية
+        const headers = [
+            'المعرف',
+            'اسم المنتج',
+            'الفئة',
+            'سعر البيع',
+            'سعر الشراء',
+            'الربح',
+            'هامش الربح (%)',
+            'الكمية الإجمالية',
+            'الحد الأدنى للكمية',
+            'المورد',
+            'الباركود',
+            'الوصف',
+            'الحالة',
+            'تاريخ الإنشاء'
+        ];
+
+        // إضافة أعمدة المخازن
+        warehouses.forEach(warehouse => {
+            headers.push(`مخزن: ${warehouse.name}`);
+        });
+
+        csvData.push(headers);
+
+        // إضافة بيانات المنتجات
+        products.forEach(product => {
+            const row = [
+                product.id || '',
+                product.name || '',
+                product.category || '',
+                product.salePrice || product.price || 0,
+                product.purchasePrice || 0,
+                product.profit || 0,
+                product.profitPercentage || 0,
+                product.quantity || 0,
+                product.minStock || 0,
+                suppliersMap[product.supplierId] || '',
+                product.barcode || '',
+                product.description || '',
+                getProductStatusText(product.status),
+                product.createdAt ? new Date(product.createdAt).toLocaleDateString('ar-SA') : ''
+            ];
+
+            // إضافة كميات المخازن
+            warehouses.forEach(warehouse => {
+                const warehouseQuantity = product.warehouseDistribution && product.warehouseDistribution[warehouse.id]
+                    ? product.warehouseDistribution[warehouse.id]
+                    : 0;
+                row.push(warehouseQuantity);
+            });
+
+            csvData.push(row);
+        });
+
+        // تحويل البيانات إلى CSV
+        const csvContent = csvData.map(row =>
+            row.map(field => {
+                // تنظيف البيانات وإضافة علامات اقتباس للنصوص التي تحتوي على فواصل
+                const cleanField = String(field).replace(/"/g, '""');
+                return cleanField.includes(',') || cleanField.includes('\n') || cleanField.includes('"')
+                    ? `"${cleanField}"`
+                    : cleanField;
+            }).join(',')
+        ).join('\n');
+
+        // إنشاء اسم الملف مع التاريخ
+        const today = new Date();
+        const dateStr = today.getFullYear() + '-' +
+                       String(today.getMonth() + 1).padStart(2, '0') + '-' +
+                       String(today.getDate()).padStart(2, '0');
+        const filename = `products_export_${dateStr}.csv`;
+
+        // تحميل الملف
+        downloadCSVFile(csvContent, filename);
+
+        showNotification(`تم تصدير ${products.length} منتج بنجاح`, 'success');
+
+    } catch (error) {
+        console.error('خطأ في تصدير المنتجات:', error);
+        showNotification('خطأ في تصدير المنتجات', 'error');
+    }
+}
+
+// عرض نافذة استيراد المنتجات
+function showImportProductsModal() {
+    const content = `
+        <div class="import-products-form">
+            <div class="form-group">
+                <label class="form-label">اختر ملف CSV للاستيراد</label>
+                <div class="file-input-container">
+                    <input type="file" id="importProductsFile" accept=".csv" class="file-input">
+                    <label for="importProductsFile" class="file-input-label">
+                        <i class="fas fa-upload"></i>
+                        اختر ملف CSV
+                    </label>
+                </div>
+                <small class="form-help">يجب أن يكون الملف بصيغة CSV ويحتوي على الحقول المطلوبة</small>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">خيارات الاستيراد</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="skipDuplicates" checked>
+                        <span class="checkmark"></span>
+                        تخطي المنتجات المكررة (بناءً على الباركود)
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="updateExisting">
+                        <span class="checkmark"></span>
+                        تحديث المنتجات الموجودة
+                    </label>
+                </div>
+            </div>
+
+            <div id="importProgress" class="import-progress hidden">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">جاري المعالجة...</div>
+            </div>
+
+            <div id="importResults" class="import-results hidden">
+                <h4>نتائج الاستيراد</h4>
+                <div id="importSummary"></div>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-primary" onclick="processProductsImport()">
+                    <i class="fas fa-upload"></i>
+                    بدء الاستيراد
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">
+                    إلغاء
+                </button>
+            </div>
+        </div>
+    `;
+
+    showModal('استيراد المنتجات', content);
+}
+
+// معالجة استيراد المنتجات
+function processProductsImport() {
+    try {
+        const fileInput = document.getElementById('importProductsFile');
+        const skipDuplicates = document.getElementById('skipDuplicates').checked;
+        const updateExisting = document.getElementById('updateExisting').checked;
+
+        if (!fileInput.files || fileInput.files.length === 0) {
+            showNotification('يرجى اختيار ملف CSV للاستيراد', 'warning');
+            return;
+        }
+
+        const file = fileInput.files[0];
+
+        // التحقق من نوع الملف
+        if (!file.name.toLowerCase().endsWith('.csv')) {
+            showNotification('يرجى اختيار ملف CSV صحيح', 'error');
+            return;
+        }
+
+        // إظهار شريط التقدم
+        document.getElementById('importProgress').classList.remove('hidden');
+        document.getElementById('importResults').classList.add('hidden');
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const csvContent = e.target.result;
+                importProductsFromCSV(csvContent, skipDuplicates, updateExisting);
+            } catch (error) {
+                console.error('خطأ في قراءة الملف:', error);
+                showNotification('خطأ في قراءة الملف', 'error');
+                document.getElementById('importProgress').classList.add('hidden');
+            }
+        };
+
+        reader.onerror = function() {
+            showNotification('خطأ في قراءة الملف', 'error');
+            document.getElementById('importProgress').classList.add('hidden');
+        };
+
+        reader.readAsText(file, 'UTF-8');
+
+    } catch (error) {
+        console.error('خطأ في معالجة الاستيراد:', error);
+        showNotification('خطأ في معالجة الاستيراد', 'error');
+    }
+}
+
+// استيراد المنتجات من محتوى CSV
+function importProductsFromCSV(csvContent, skipDuplicates, updateExisting) {
+    try {
+        const lines = csvContent.split('\n').filter(line => line.trim());
+
+        if (lines.length < 2) {
+            showNotification('الملف فارغ أو لا يحتوي على بيانات صحيحة', 'error');
+            document.getElementById('importProgress').classList.add('hidden');
+            return;
+        }
+
+        // قراءة الرؤوس
+        const headers = lines[0].split(',').map(header => header.trim().replace(/"/g, ''));
+        const dataLines = lines.slice(1);
+
+        // التحقق من الحقول المطلوبة
+        const requiredFields = ['اسم المنتج', 'سعر البيع'];
+        const missingFields = requiredFields.filter(field => !headers.includes(field));
+
+        if (missingFields.length > 0) {
+            showNotification(`الحقول المطلوبة مفقودة: ${missingFields.join(', ')}`, 'error');
+            document.getElementById('importProgress').classList.add('hidden');
+            return;
+        }
+
+        const existingProducts = db.getTable('products');
+        const suppliers = db.getTable('suppliers');
+        const categories = db.getTable('categories');
+
+        let imported = 0;
+        let updated = 0;
+        let skipped = 0;
+        let errors = 0;
+        const errorMessages = [];
+
+        // معالجة كل سطر
+        dataLines.forEach((line, index) => {
+            try {
+                const values = parseCSVLine(line);
+
+                if (values.length !== headers.length) {
+                    errors++;
+                    errorMessages.push(`السطر ${index + 2}: عدد الأعمدة غير متطابق`);
+                    return;
+                }
+
+                const productData = {};
+                headers.forEach((header, i) => {
+                    productData[header] = values[i];
+                });
+
+                // التحقق من البيانات المطلوبة
+                if (!productData['اسم المنتج'] || !productData['اسم المنتج'].trim()) {
+                    errors++;
+                    errorMessages.push(`السطر ${index + 2}: اسم المنتج مطلوب`);
+                    return;
+                }
+
+                const salePrice = parseFloat(productData['سعر البيع']) || 0;
+                if (salePrice <= 0) {
+                    errors++;
+                    errorMessages.push(`السطر ${index + 2}: سعر البيع يجب أن يكون أكبر من صفر`);
+                    return;
+                }
+
+                // البحث عن منتج موجود بنفس الباركود
+                const barcode = productData['الباركود'] || '';
+                const existingProduct = barcode ? existingProducts.find(p => p.barcode === barcode) : null;
+
+                if (existingProduct) {
+                    if (skipDuplicates && !updateExisting) {
+                        skipped++;
+                        return;
+                    }
+
+                    if (updateExisting) {
+                        // تحديث المنتج الموجود
+                        const updatedProduct = {
+                            ...existingProduct,
+                            name: productData['اسم المنتج'].trim(),
+                            salePrice: salePrice,
+                            purchasePrice: parseFloat(productData['سعر الشراء']) || existingProduct.purchasePrice || 0,
+                            minStock: parseInt(productData['الحد الأدنى للكمية']) || existingProduct.minStock || 5,
+                            category: productData['الفئة'] || existingProduct.category || 'عام',
+                            description: productData['الوصف'] || existingProduct.description || '',
+                            updatedAt: new Date().toISOString()
+                        };
+
+                        // حساب الربح
+                        if (updatedProduct.salePrice && updatedProduct.purchasePrice) {
+                            updatedProduct.profit = updatedProduct.salePrice - updatedProduct.purchasePrice;
+                            updatedProduct.profitPercentage = updatedProduct.purchasePrice > 0
+                                ? ((updatedProduct.profit / updatedProduct.purchasePrice) * 100).toFixed(2)
+                                : 0;
+                        }
+
+                        db.update('products', existingProduct.id, updatedProduct);
+                        updated++;
+                    } else {
+                        skipped++;
+                    }
+                } else {
+                    // إضافة منتج جديد
+                    const newProduct = {
+                        id: 'product_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                        name: productData['اسم المنتج'].trim(),
+                        salePrice: salePrice,
+                        purchasePrice: parseFloat(productData['سعر الشراء']) || 0,
+                        minStock: parseInt(productData['الحد الأدنى للكمية']) || 5,
+                        quantity: 0, // الكمية الافتراضية
+                        category: productData['الفئة'] || 'عام',
+                        barcode: barcode || 'AUTO_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+                        description: productData['الوصف'] || '',
+                        createdAt: new Date().toISOString(),
+                        status: 'out_of_stock'
+                    };
+
+                    // البحث عن المورد
+                    const supplierName = productData['المورد'];
+                    if (supplierName) {
+                        const supplier = suppliers.find(s => s.name.includes(supplierName) || supplierName.includes(s.name));
+                        if (supplier) {
+                            newProduct.supplierId = supplier.id;
+                        }
+                    }
+
+                    // حساب الربح
+                    if (newProduct.salePrice && newProduct.purchasePrice) {
+                        newProduct.profit = newProduct.salePrice - newProduct.purchasePrice;
+                        newProduct.profitPercentage = newProduct.purchasePrice > 0
+                            ? ((newProduct.profit / newProduct.purchasePrice) * 100).toFixed(2)
+                            : 0;
+                    }
+
+                    db.insert('products', newProduct);
+                    imported++;
+                }
+
+                // تحديث شريط التقدم
+                const progress = ((index + 1) / dataLines.length) * 100;
+                document.getElementById('progressFill').style.width = progress + '%';
+                document.getElementById('progressText').textContent = `معالجة السطر ${index + 1} من ${dataLines.length}`;
+
+            } catch (error) {
+                errors++;
+                errorMessages.push(`السطر ${index + 2}: ${error.message}`);
+            }
+        });
+
+        // إخفاء شريط التقدم وإظهار النتائج
+        document.getElementById('importProgress').classList.add('hidden');
+        document.getElementById('importResults').classList.remove('hidden');
+
+        const summaryHTML = `
+            <div class="import-summary">
+                <div class="summary-item success">
+                    <i class="fas fa-check-circle"></i>
+                    <span>تم استيراد: ${imported} منتج</span>
+                </div>
+                <div class="summary-item info">
+                    <i class="fas fa-edit"></i>
+                    <span>تم تحديث: ${updated} منتج</span>
+                </div>
+                <div class="summary-item warning">
+                    <i class="fas fa-skip-forward"></i>
+                    <span>تم تخطي: ${skipped} منتج</span>
+                </div>
+                <div class="summary-item error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>أخطاء: ${errors}</span>
+                </div>
+            </div>
+            ${errorMessages.length > 0 ? `
+                <div class="error-details">
+                    <h5>تفاصيل الأخطاء:</h5>
+                    <ul>
+                        ${errorMessages.slice(0, 10).map(msg => `<li>${msg}</li>`).join('')}
+                        ${errorMessages.length > 10 ? `<li>... و ${errorMessages.length - 10} أخطاء أخرى</li>` : ''}
+                    </ul>
+                </div>
+            ` : ''}
+        `;
+
+        document.getElementById('importSummary').innerHTML = summaryHTML;
+
+        if (imported > 0 || updated > 0) {
+            showNotification(`تم الاستيراد بنجاح: ${imported} جديد، ${updated} محدث`, 'success');
+
+            // إعادة تحميل المنتجات
+            setTimeout(() => {
+                if (typeof loadProducts === 'function') {
+                    loadProducts();
+                }
+            }, 1000);
+        } else if (errors > 0) {
+            showNotification('فشل في الاستيراد بسبب أخطاء في البيانات', 'error');
+        } else {
+            showNotification('لم يتم استيراد أي منتجات جديدة', 'info');
+        }
+
+    } catch (error) {
+        console.error('خطأ في معالجة CSV:', error);
+        showNotification('خطأ في معالجة ملف CSV', 'error');
+        document.getElementById('importProgress').classList.add('hidden');
+    }
+}
+
+// تحميل قالب CSV للمنتجات
+function downloadProductsTemplate() {
+    try {
+        // إنشاء قالب CSV مع الحقول الأساسية
+        const headers = [
+            'اسم المنتج',
+            'سعر البيع',
+            'سعر الشراء',
+            'الحد الأدنى للكمية',
+            'الفئة',
+            'المورد',
+            'الباركود',
+            'الوصف'
+        ];
+
+        // إضافة صف مثال
+        const exampleRow = [
+            'لابتوب ديل XPS 13',
+            '450.000',
+            '350.000',
+            '5',
+            'إلكترونيات',
+            'شركة الخليج للإلكترونيات',
+            'DELL123456789',
+            'لابتوب عالي الأداء مع شاشة 13 بوصة'
+        ];
+
+        // تحضير محتوى CSV
+        const csvData = [headers, exampleRow];
+        const csvContent = csvData.map(row =>
+            row.map(field => {
+                const cleanField = String(field).replace(/"/g, '""');
+                return cleanField.includes(',') || cleanField.includes('\n') || cleanField.includes('"')
+                    ? `"${cleanField}"`
+                    : cleanField;
+            }).join(',')
+        ).join('\n');
+
+        // تحميل الملف
+        downloadCSVFile(csvContent, 'products_template.csv');
+
+        showNotification('تم تحميل قالب المنتجات بنجاح', 'success');
+
+    } catch (error) {
+        console.error('خطأ في تحميل القالب:', error);
+        showNotification('خطأ في تحميل القالب', 'error');
+    }
+}
+
+// وظائف مساعدة لمعالجة CSV
+
+// تحميل ملف CSV
+function downloadCSVFile(content, filename) {
+    try {
+        // إضافة BOM للدعم الصحيح للنصوص العربية
+        const BOM = '\uFEFF';
+        const csvContent = BOM + content;
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } else {
+            // للمتصفحات القديمة
+            window.open('data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent));
+        }
+    } catch (error) {
+        console.error('خطأ في تحميل الملف:', error);
+        throw new Error('فشل في تحميل الملف');
+    }
+}
+
+// تحليل سطر CSV مع دعم النصوص المحاطة بعلامات اقتباس
+function parseCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    let i = 0;
+
+    while (i < line.length) {
+        const char = line[i];
+
+        if (char === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+                // علامة اقتباس مضاعفة داخل النص
+                current += '"';
+                i += 2;
+            } else {
+                // بداية أو نهاية النص المحاط بعلامات اقتباس
+                inQuotes = !inQuotes;
+                i++;
+            }
+        } else if (char === ',' && !inQuotes) {
+            // فاصلة خارج علامات الاقتباس
+            result.push(current.trim());
+            current = '';
+            i++;
+        } else {
+            current += char;
+            i++;
+        }
+    }
+
+    // إضافة الحقل الأخير
+    result.push(current.trim());
+
+    return result;
+}
+
+// الحصول على نص حالة المنتج
+function getProductStatusText(status) {
+    switch (status) {
+        case 'available':
+            return 'متوفر';
+        case 'low_stock':
+            return 'مخزون منخفض';
+        case 'out_of_stock':
+            return 'نفد المخزون';
+        default:
+            return 'غير محدد';
+    }
+}
+
+// ===== تصدير شامل لجميع البيانات =====
+
+// تصدير جميع البيانات في ملف ZIP
+function exportAllDataToZip() {
+    try {
+        if (!window.db) {
+            showNotification('قاعدة البيانات غير متاحة', 'error');
+            return;
+        }
+
+        // إظهار مؤشر التحميل
+        showNotification('جاري تحضير ملفات التصدير...', 'info');
+
+        // تحضير البيانات لجميع الجداول
+        const exportData = {
+            products: prepareProductsForExport(),
+            customers: prepareCustomersForExport(),
+            suppliers: prepareSuppliersForExport(),
+            warehouses: prepareWarehousesForExport(),
+            sales: prepareSalesForExport(),
+            purchases: preparePurchasesForExport(),
+            categories: prepareCategoriesForExport(),
+            settings: prepareSettingsForExport()
+        };
+
+        // إنشاء ملفات CSV
+        const csvFiles = {};
+        Object.keys(exportData).forEach(tableName => {
+            if (exportData[tableName] && exportData[tableName].length > 0) {
+                csvFiles[`${tableName}.csv`] = createCSVContent(exportData[tableName]);
+            }
+        });
+
+        // إنشاء ملف ZIP
+        createZipFile(csvFiles);
+
+    } catch (error) {
+        console.error('خطأ في تصدير البيانات:', error);
+        showNotification('خطأ في تصدير البيانات', 'error');
+    }
+}
+
+// تحضير بيانات المنتجات للتصدير
+function prepareProductsForExport() {
+    try {
+        const products = db.getTable('products');
+        const suppliers = db.getTable('suppliers');
+        const warehouses = db.getTable('warehouses');
+
+        if (!products || products.length === 0) return [];
+
+        // إنشاء خريطة للموردين والمخازن
+        const suppliersMap = {};
+        suppliers.forEach(supplier => {
+            suppliersMap[supplier.id] = supplier.name;
+        });
+
+        const warehousesMap = {};
+        warehouses.forEach(warehouse => {
+            warehousesMap[warehouse.id] = warehouse.name;
+        });
+
+        // تحضير البيانات
+        const exportData = [];
+
+        // إضافة الرؤوس
+        const headers = [
+            'المعرف', 'اسم المنتج', 'الفئة', 'سعر البيع', 'سعر الشراء',
+            'الربح', 'هامش الربح (%)', 'الكمية الإجمالية', 'الحد الأدنى للكمية',
+            'المورد', 'الباركود', 'الوصف', 'الحالة', 'تاريخ الإنشاء'
+        ];
+
+        // إضافة أعمدة المخازن
+        warehouses.forEach(warehouse => {
+            headers.push(`مخزن: ${warehouse.name}`);
+        });
+
+        exportData.push(headers);
+
+        // إضافة بيانات المنتجات
+        products.forEach(product => {
+            const row = [
+                product.id || '',
+                product.name || '',
+                product.category || '',
+                product.salePrice || product.price || 0,
+                product.purchasePrice || 0,
+                product.profit || 0,
+                product.profitPercentage || 0,
+                product.quantity || 0,
+                product.minStock || 0,
+                suppliersMap[product.supplierId] || '',
+                product.barcode || '',
+                product.description || '',
+                getProductStatusText(product.status),
+                product.createdAt ? new Date(product.createdAt).toLocaleDateString('ar-SA') : ''
+            ];
+
+            // إضافة كميات المخازن
+            warehouses.forEach(warehouse => {
+                const warehouseQuantity = product.warehouseDistribution && product.warehouseDistribution[warehouse.id]
+                    ? product.warehouseDistribution[warehouse.id]
+                    : 0;
+                row.push(warehouseQuantity);
+            });
+
+            exportData.push(row);
+        });
+
+        return exportData;
+
+    } catch (error) {
+        console.error('خطأ في تحضير بيانات المنتجات:', error);
+        return [];
+    }
+}
+
+// تحضير بيانات العملاء للتصدير
+function prepareCustomersForExport() {
+    try {
+        const customers = db.getTable('customers').filter(c => c.id !== 'guest');
+        if (!customers || customers.length === 0) return [];
+
+        const exportData = [];
+
+        // إضافة الرؤوس
+        exportData.push([
+            'المعرف', 'اسم العميل', 'رقم الهاتف', 'البريد الإلكتروني',
+            'العنوان', 'الرصيد', 'تاريخ الإنشاء'
+        ]);
+
+        // إضافة بيانات العملاء
+        customers.forEach(customer => {
+            exportData.push([
+                customer.id || '',
+                customer.name || '',
+                customer.phone || '',
+                customer.email || '',
+                customer.address || '',
+                customer.balance || 0,
+                customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('ar-SA') : ''
+            ]);
+        });
+
+        return exportData;
+    } catch (error) {
+        console.error('خطأ في تحضير بيانات العملاء:', error);
+        return [];
+    }
+}
+
+// تحضير بيانات الموردين للتصدير
+function prepareSuppliersForExport() {
+    try {
+        const suppliers = db.getTable('suppliers');
+        if (!suppliers || suppliers.length === 0) return [];
+
+        const exportData = [];
+
+        // إضافة الرؤوس
+        exportData.push([
+            'المعرف', 'اسم المورد', 'رقم الهاتف', 'البريد الإلكتروني',
+            'العنوان', 'الرصيد', 'تاريخ الإنشاء'
+        ]);
+
+        // إضافة بيانات الموردين
+        suppliers.forEach(supplier => {
+            exportData.push([
+                supplier.id || '',
+                supplier.name || '',
+                supplier.phone || '',
+                supplier.email || '',
+                supplier.address || '',
+                supplier.balance || 0,
+                supplier.createdAt ? new Date(supplier.createdAt).toLocaleDateString('ar-SA') : ''
+            ]);
+        });
+
+        return exportData;
+    } catch (error) {
+        console.error('خطأ في تحضير بيانات الموردين:', error);
+        return [];
+    }
+}
+
+// تحضير بيانات المخازن للتصدير
+function prepareWarehousesForExport() {
+    try {
+        const warehouses = db.getTable('warehouses');
+        if (!warehouses || warehouses.length === 0) return [];
+
+        const exportData = [];
+
+        // إضافة الرؤوس
+        exportData.push([
+            'المعرف', 'اسم المخزن', 'الموقع', 'المدير', 'رقم الهاتف',
+            'الحالة', 'تاريخ الإنشاء'
+        ]);
+
+        // إضافة بيانات المخازن
+        warehouses.forEach(warehouse => {
+            exportData.push([
+                warehouse.id || '',
+                warehouse.name || '',
+                warehouse.location || '',
+                warehouse.manager || '',
+                warehouse.phone || '',
+                warehouse.isActive ? 'نشط' : 'غير نشط',
+                warehouse.createdAt ? new Date(warehouse.createdAt).toLocaleDateString('ar-SA') : ''
+            ]);
+        });
+
+        return exportData;
+    } catch (error) {
+        console.error('خطأ في تحضير بيانات المخازن:', error);
+        return [];
+    }
+}
+
+// تحضير بيانات المبيعات للتصدير
+function prepareSalesForExport() {
+    try {
+        const sales = db.getTable('sales');
+        const customers = db.getTable('customers');
+        if (!sales || sales.length === 0) return [];
+
+        // إنشاء خريطة للعملاء
+        const customersMap = {};
+        customers.forEach(customer => {
+            customersMap[customer.id] = customer.name;
+        });
+
+        const exportData = [];
+
+        // إضافة الرؤوس
+        exportData.push([
+            'رقم الفاتورة', 'العميل', 'تاريخ البيع', 'المجموع الفرعي',
+            'الضريبة', 'الخصم', 'المجموع الكلي', 'المدفوع', 'الباقي', 'طريقة الدفع'
+        ]);
+
+        // إضافة بيانات المبيعات
+        sales.forEach(sale => {
+            exportData.push([
+                sale.id || '',
+                customersMap[sale.customerId] || 'غير محدد',
+                sale.createdAt ? new Date(sale.createdAt).toLocaleDateString('ar-SA') : '',
+                sale.subtotal || 0,
+                sale.tax || 0,
+                sale.discount || 0,
+                sale.total || 0,
+                sale.paid || 0,
+                sale.remaining || 0,
+                sale.paymentMethod || 'نقدي'
+            ]);
+        });
+
+        return exportData;
+    } catch (error) {
+        console.error('خطأ في تحضير بيانات المبيعات:', error);
+        return [];
+    }
+}
+
+// تحضير بيانات المشتريات للتصدير
+function preparePurchasesForExport() {
+    try {
+        const purchases = db.getTable('purchases');
+        const suppliers = db.getTable('suppliers');
+        if (!purchases || purchases.length === 0) return [];
+
+        // إنشاء خريطة للموردين
+        const suppliersMap = {};
+        suppliers.forEach(supplier => {
+            suppliersMap[supplier.id] = supplier.name;
+        });
+
+        const exportData = [];
+
+        // إضافة الرؤوس
+        exportData.push([
+            'رقم الفاتورة', 'المورد', 'تاريخ الشراء', 'المجموع الفرعي',
+            'الضريبة', 'الخصم', 'المجموع الكلي', 'المدفوع', 'الباقي', 'طريقة الدفع'
+        ]);
+
+        // إضافة بيانات المشتريات
+        purchases.forEach(purchase => {
+            exportData.push([
+                purchase.id || '',
+                suppliersMap[purchase.supplierId] || 'غير محدد',
+                purchase.createdAt ? new Date(purchase.createdAt).toLocaleDateString('ar-SA') : '',
+                purchase.subtotal || 0,
+                purchase.tax || 0,
+                purchase.discount || 0,
+                purchase.total || 0,
+                purchase.paid || 0,
+                purchase.remaining || 0,
+                purchase.paymentMethod || 'نقدي'
+            ]);
+        });
+
+        return exportData;
+    } catch (error) {
+        console.error('خطأ في تحضير بيانات المشتريات:', error);
+        return [];
+    }
+}
+
+// تحضير بيانات الفئات للتصدير
+function prepareCategoriesForExport() {
+    try {
+        const categories = db.getTable('categories');
+        if (!categories || categories.length === 0) return [];
+
+        const exportData = [];
+
+        // إضافة الرؤوس
+        exportData.push([
+            'المعرف', 'اسم الفئة', 'الوصف', 'تاريخ الإنشاء'
+        ]);
+
+        // إضافة بيانات الفئات
+        categories.forEach(category => {
+            exportData.push([
+                category.id || '',
+                category.name || '',
+                category.description || '',
+                category.createdAt ? new Date(category.createdAt).toLocaleDateString('ar-SA') : ''
+            ]);
+        });
+
+        return exportData;
+    } catch (error) {
+        console.error('خطأ في تحضير بيانات الفئات:', error);
+        return [];
+    }
+}
+
+// تحضير بيانات الإعدادات للتصدير
+function prepareSettingsForExport() {
+    try {
+        const settings = db.getTable('settings');
+        if (!settings) return [];
+
+        const exportData = [];
+
+        // إضافة الرؤوس
+        exportData.push([
+            'المفتاح', 'القيمة'
+        ]);
+
+        // إضافة بيانات الإعدادات (بدون كلمة المرور)
+        Object.keys(settings).forEach(key => {
+            if (key !== 'password') {
+                exportData.push([
+                    key,
+                    typeof settings[key] === 'object' ? JSON.stringify(settings[key]) : settings[key]
+                ]);
+            }
+        });
+
+        return exportData;
+    } catch (error) {
+        console.error('خطأ في تحضير بيانات الإعدادات:', error);
+        return [];
+    }
+}
+
+// إنشاء محتوى CSV من البيانات
+function createCSVContent(data) {
+    try {
+        if (!data || data.length === 0) return '';
+
+        return data.map(row =>
+            row.map(field => {
+                // تنظيف البيانات وإضافة علامات اقتباس للنصوص التي تحتوي على فواصل
+                const cleanField = String(field || '').replace(/"/g, '""');
+                return cleanField.includes(',') || cleanField.includes('\n') || cleanField.includes('"')
+                    ? `"${cleanField}"`
+                    : cleanField;
+            }).join(',')
+        ).join('\n');
+    } catch (error) {
+        console.error('خطأ في إنشاء محتوى CSV:', error);
+        return '';
+    }
+}
+
+// إنشاء ملف ZIP باستخدام JSZip
+function createZipFile(csvFiles) {
+    try {
+        // التحقق من وجود مكتبة JSZip
+        if (typeof JSZip === 'undefined') {
+            // استخدام طريقة بديلة بدون JSZip
+            createSimpleZipFile(csvFiles);
+            return;
+        }
+
+        const zip = new JSZip();
+
+        // إضافة ملفات CSV إلى ZIP
+        Object.keys(csvFiles).forEach(filename => {
+            if (csvFiles[filename]) {
+                // إضافة BOM للدعم الصحيح للنصوص العربية
+                const BOM = '\uFEFF';
+                zip.file(filename, BOM + csvFiles[filename]);
+            }
+        });
+
+        // إنشاء اسم الملف مع التاريخ
+        const today = new Date();
+        const dateStr = today.getFullYear() + '-' +
+                       String(today.getMonth() + 1).padStart(2, '0') + '-' +
+                       String(today.getDate()).padStart(2, '0');
+        const filename = `database_export_${dateStr}.zip`;
+
+        // تحميل ملف ZIP
+        zip.generateAsync({type: 'blob'}).then(function(content) {
+            downloadBlob(content, filename);
+
+            const fileCount = Object.keys(csvFiles).length;
+            showNotification(`تم تصدير ${fileCount} ملف بنجاح في ملف ZIP`, 'success');
+        }).catch(function(error) {
+            console.error('خطأ في إنشاء ملف ZIP:', error);
+            showNotification('خطأ في إنشاء ملف ZIP', 'error');
+        });
+
+    } catch (error) {
+        console.error('خطأ في إنشاء ملف ZIP:', error);
+        // استخدام طريقة بديلة
+        createSimpleZipFile(csvFiles);
+    }
+}
+
+// طريقة بديلة لتحميل الملفات بدون JSZip
+function createSimpleZipFile(csvFiles) {
+    try {
+        // تحميل كل ملف CSV منفصل
+        const today = new Date();
+        const dateStr = today.getFullYear() + '-' +
+                       String(today.getMonth() + 1).padStart(2, '0') + '-' +
+                       String(today.getDate()).padStart(2, '0');
+
+        let downloadedCount = 0;
+        Object.keys(csvFiles).forEach((filename, index) => {
+            if (csvFiles[filename]) {
+                setTimeout(() => {
+                    const finalFilename = `${dateStr}_${filename}`;
+                    downloadCSVFile(csvFiles[filename], finalFilename);
+                    downloadedCount++;
+
+                    if (downloadedCount === Object.keys(csvFiles).length) {
+                        showNotification(`تم تصدير ${downloadedCount} ملف CSV بنجاح`, 'success');
+                    }
+                }, index * 500); // تأخير بسيط بين التحميلات
+            }
+        });
+
+    } catch (error) {
+        console.error('خطأ في تحميل الملفات:', error);
+        showNotification('خطأ في تحميل الملفات', 'error');
+    }
+}
+
+// تحميل ملف Blob
+function downloadBlob(blob, filename) {
+    try {
+        const link = document.createElement('a');
+
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } else {
+            // للمتصفحات القديمة
+            const reader = new FileReader();
+            reader.onload = function() {
+                window.open(reader.result);
+            };
+            reader.readAsDataURL(blob);
+        }
+    } catch (error) {
+        console.error('خطأ في تحميل الملف:', error);
+        throw new Error('فشل في تحميل الملف');
+    }
+}
+
+// ===== وظائف تصدير واستيراد العملاء =====
+
+// تصدير العملاء إلى ملف CSV
+function exportCustomersToCSV() {
+    try {
+        if (!window.db) {
+            showNotification('قاعدة البيانات غير متاحة', 'error');
+            return;
+        }
+
+        const customers = db.getTable('customers').filter(c => c.id !== 'guest');
+
+        if (customers.length === 0) {
+            showNotification('لا توجد عملاء للتصدير', 'warning');
+            return;
+        }
+
+        // تحضير البيانات للتصدير
+        const csvData = [];
+
+        // إضافة الرؤوس باللغة العربية
+        const headers = [
+            'المعرف',
+            'اسم العميل',
+            'رقم الهاتف',
+            'البريد الإلكتروني',
+            'العنوان',
+            'الرصيد',
+            'تاريخ الإنشاء'
+        ];
+
+        csvData.push(headers);
+
+        // إضافة بيانات العملاء
+        customers.forEach(customer => {
+            const row = [
+                customer.id || '',
+                customer.name || '',
+                customer.phone || '',
+                customer.email || '',
+                customer.address || '',
+                customer.balance || 0,
+                customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('ar-SA') : ''
+            ];
+
+            csvData.push(row);
+        });
+
+        // تحويل البيانات إلى CSV
+        const csvContent = csvData.map(row =>
+            row.map(field => {
+                const cleanField = String(field).replace(/"/g, '""');
+                return cleanField.includes(',') || cleanField.includes('\n') || cleanField.includes('"')
+                    ? `"${cleanField}"`
+                    : cleanField;
+            }).join(',')
+        ).join('\n');
+
+        // إنشاء اسم الملف مع التاريخ
+        const today = new Date();
+        const dateStr = today.getFullYear() + '-' +
+                       String(today.getMonth() + 1).padStart(2, '0') + '-' +
+                       String(today.getDate()).padStart(2, '0');
+        const filename = `customers_export_${dateStr}.csv`;
+
+        // تحميل الملف
+        downloadCSVFile(csvContent, filename);
+
+        showNotification(`تم تصدير ${customers.length} عميل بنجاح`, 'success');
+
+    } catch (error) {
+        console.error('خطأ في تصدير العملاء:', error);
+        showNotification('خطأ في تصدير العملاء', 'error');
+    }
+}
+
+// عرض نافذة استيراد العملاء
+function showImportCustomersModal() {
+    const content = `
+        <div class="import-customers-form">
+            <div class="form-group">
+                <label class="form-label">اختر ملف CSV للاستيراد</label>
+                <div class="file-input-container">
+                    <input type="file" id="importCustomersFile" accept=".csv" class="file-input">
+                    <label for="importCustomersFile" class="file-input-label">
+                        <i class="fas fa-upload"></i>
+                        اختر ملف CSV
+                    </label>
+                </div>
+                <small class="form-help">يجب أن يكون الملف بصيغة CSV ويحتوي على الحقول المطلوبة</small>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">خيارات الاستيراد</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="skipDuplicateCustomers" checked>
+                        <span class="checkmark"></span>
+                        تخطي العملاء المكررين (بناءً على رقم الهاتف)
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="updateExistingCustomers">
+                        <span class="checkmark"></span>
+                        تحديث العملاء الموجودين
+                    </label>
+                </div>
+            </div>
+
+            <div id="importCustomersProgress" class="import-progress hidden">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="customersProgressFill"></div>
+                </div>
+                <div class="progress-text" id="customersProgressText">جاري المعالجة...</div>
+            </div>
+
+            <div id="importCustomersResults" class="import-results hidden">
+                <h4>نتائج الاستيراد</h4>
+                <div id="importCustomersSummary"></div>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-primary" onclick="processCustomersImport()">
+                    <i class="fas fa-upload"></i>
+                    بدء الاستيراد
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">
+                    إلغاء
+                </button>
+            </div>
+        </div>
+    `;
+
+    showModal('استيراد العملاء', content);
+}
+
+// معالجة استيراد العملاء
+function processCustomersImport() {
+    try {
+        const fileInput = document.getElementById('importCustomersFile');
+        const skipDuplicates = document.getElementById('skipDuplicateCustomers').checked;
+        const updateExisting = document.getElementById('updateExistingCustomers').checked;
+
+        if (!fileInput.files || fileInput.files.length === 0) {
+            showNotification('يرجى اختيار ملف CSV للاستيراد', 'warning');
+            return;
+        }
+
+        const file = fileInput.files[0];
+
+        if (!file.name.toLowerCase().endsWith('.csv')) {
+            showNotification('يرجى اختيار ملف CSV صحيح', 'error');
+            return;
+        }
+
+        // إظهار شريط التقدم
+        document.getElementById('importCustomersProgress').classList.remove('hidden');
+        document.getElementById('importCustomersResults').classList.add('hidden');
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const csvContent = e.target.result;
+                importCustomersFromCSV(csvContent, skipDuplicates, updateExisting);
+            } catch (error) {
+                console.error('خطأ في قراءة الملف:', error);
+                showNotification('خطأ في قراءة الملف', 'error');
+                document.getElementById('importCustomersProgress').classList.add('hidden');
+            }
+        };
+
+        reader.onerror = function() {
+            showNotification('خطأ في قراءة الملف', 'error');
+            document.getElementById('importCustomersProgress').classList.add('hidden');
+        };
+
+        reader.readAsText(file, 'UTF-8');
+
+    } catch (error) {
+        console.error('خطأ في معالجة الاستيراد:', error);
+        showNotification('خطأ في معالجة الاستيراد', 'error');
+    }
+}
+
+// استيراد العملاء من محتوى CSV
+function importCustomersFromCSV(csvContent, skipDuplicates, updateExisting) {
+    try {
+        const lines = csvContent.split('\n').filter(line => line.trim());
+
+        if (lines.length < 2) {
+            showNotification('الملف فارغ أو لا يحتوي على بيانات صحيحة', 'error');
+            document.getElementById('importCustomersProgress').classList.add('hidden');
+            return;
+        }
+
+        const headers = lines[0].split(',').map(header => header.trim().replace(/"/g, ''));
+        const dataLines = lines.slice(1);
+
+        // التحقق من الحقول المطلوبة
+        const requiredFields = ['اسم العميل'];
+        const missingFields = requiredFields.filter(field => !headers.includes(field));
+
+        if (missingFields.length > 0) {
+            showNotification(`الحقول المطلوبة مفقودة: ${missingFields.join(', ')}`, 'error');
+            document.getElementById('importCustomersProgress').classList.add('hidden');
+            return;
+        }
+
+        const existingCustomers = db.getTable('customers');
+
+        let imported = 0;
+        let updated = 0;
+        let skipped = 0;
+        let errors = 0;
+        const errorMessages = [];
+
+        // معالجة كل سطر
+        dataLines.forEach((line, index) => {
+            try {
+                const values = parseCSVLine(line);
+
+                if (values.length !== headers.length) {
+                    errors++;
+                    errorMessages.push(`السطر ${index + 2}: عدد الأعمدة غير متطابق`);
+                    return;
+                }
+
+                const customerData = {};
+                headers.forEach((header, i) => {
+                    customerData[header] = values[i];
+                });
+
+                // التحقق من البيانات المطلوبة
+                if (!customerData['اسم العميل'] || !customerData['اسم العميل'].trim()) {
+                    errors++;
+                    errorMessages.push(`السطر ${index + 2}: اسم العميل مطلوب`);
+                    return;
+                }
+
+                // البحث عن عميل موجود بنفس رقم الهاتف
+                const phone = customerData['رقم الهاتف'] || '';
+                const existingCustomer = phone ? existingCustomers.find(c => c.phone === phone && c.id !== 'guest') : null;
+
+                if (existingCustomer) {
+                    if (skipDuplicates && !updateExisting) {
+                        skipped++;
+                        return;
+                    }
+
+                    if (updateExisting) {
+                        // تحديث العميل الموجود
+                        const updatedCustomer = {
+                            ...existingCustomer,
+                            name: customerData['اسم العميل'].trim(),
+                            phone: customerData['رقم الهاتف'] || existingCustomer.phone || '',
+                            email: customerData['البريد الإلكتروني'] || existingCustomer.email || '',
+                            address: customerData['العنوان'] || existingCustomer.address || '',
+                            balance: parseFloat(customerData['الرصيد الابتدائي']) || existingCustomer.balance || 0,
+                            updatedAt: new Date().toISOString()
+                        };
+
+                        db.update('customers', existingCustomer.id, updatedCustomer);
+                        updated++;
+                    } else {
+                        skipped++;
+                    }
+                } else {
+                    // إضافة عميل جديد
+                    const newCustomer = {
+                        id: 'customer_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
+                        name: customerData['اسم العميل'].trim(),
+                        phone: customerData['رقم الهاتف'] || '',
+                        email: customerData['البريد الإلكتروني'] || '',
+                        address: customerData['العنوان'] || '',
+                        balance: parseFloat(customerData['الرصيد الابتدائي']) || 0,
+                        createdAt: new Date().toISOString()
+                    };
+
+                    db.insert('customers', newCustomer);
+                    imported++;
+                }
+
+                // تحديث شريط التقدم
+                const progress = ((index + 1) / dataLines.length) * 100;
+                document.getElementById('customersProgressFill').style.width = progress + '%';
+                document.getElementById('customersProgressText').textContent = `معالجة السطر ${index + 1} من ${dataLines.length}`;
+
+            } catch (error) {
+                errors++;
+                errorMessages.push(`السطر ${index + 2}: ${error.message}`);
+            }
+        });
+
+        // إخفاء شريط التقدم وإظهار النتائج
+        document.getElementById('importCustomersProgress').classList.add('hidden');
+        document.getElementById('importCustomersResults').classList.remove('hidden');
+
+        const summaryHTML = `
+            <div class="import-summary">
+                <div class="summary-item success">
+                    <i class="fas fa-check-circle"></i>
+                    <span>تم استيراد: ${imported} عميل</span>
+                </div>
+                <div class="summary-item info">
+                    <i class="fas fa-edit"></i>
+                    <span>تم تحديث: ${updated} عميل</span>
+                </div>
+                <div class="summary-item warning">
+                    <i class="fas fa-skip-forward"></i>
+                    <span>تم تخطي: ${skipped} عميل</span>
+                </div>
+                <div class="summary-item error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>أخطاء: ${errors}</span>
+                </div>
+            </div>
+            ${errorMessages.length > 0 ? `
+                <div class="error-details">
+                    <h5>تفاصيل الأخطاء:</h5>
+                    <ul>
+                        ${errorMessages.slice(0, 10).map(msg => `<li>${msg}</li>`).join('')}
+                        ${errorMessages.length > 10 ? `<li>... و ${errorMessages.length - 10} أخطاء أخرى</li>` : ''}
+                    </ul>
+                </div>
+            ` : ''}
+        `;
+
+        document.getElementById('importCustomersSummary').innerHTML = summaryHTML;
+
+        if (imported > 0 || updated > 0) {
+            showNotification(`تم الاستيراد بنجاح: ${imported} جديد، ${updated} محدث`, 'success');
+
+            // إعادة تحميل العملاء
+            setTimeout(() => {
+                if (typeof loadCustomers === 'function') {
+                    loadCustomers();
+                }
+            }, 1000);
+        } else if (errors > 0) {
+            showNotification('فشل في الاستيراد بسبب أخطاء في البيانات', 'error');
+        } else {
+            showNotification('لم يتم استيراد أي عملاء جدد', 'info');
+        }
+
+    } catch (error) {
+        console.error('خطأ في معالجة CSV:', error);
+        showNotification('خطأ في معالجة ملف CSV', 'error');
+        document.getElementById('importCustomersProgress').classList.add('hidden');
+    }
+}
+
+// تحميل قالب CSV للعملاء
+function downloadCustomersTemplate() {
+    try {
+        // إنشاء قالب CSV مع الحقول الأساسية
+        const headers = [
+            'اسم العميل',
+            'رقم الهاتف',
+            'البريد الإلكتروني',
+            'الرصيد الابتدائي',
+            'العنوان'
+        ];
+
+        // إضافة صف مثال
+        const exampleRow = [
+            'أحمد محمد علي',
+            '+965 5555 1234',
+            'ahmed@example.com',
+            '0',
+            'الكويت - حولي - شارع الخليج العربي'
+        ];
+
+        // تحضير محتوى CSV
+        const csvData = [headers, exampleRow];
+        const csvContent = csvData.map(row =>
+            row.map(field => {
+                const cleanField = String(field).replace(/"/g, '""');
+                return cleanField.includes(',') || cleanField.includes('\n') || cleanField.includes('"')
+                    ? `"${cleanField}"`
+                    : cleanField;
+            }).join(',')
+        ).join('\n');
+
+        // تحميل الملف
+        downloadCSVFile(csvContent, 'customers_template.csv');
+
+        showNotification('تم تحميل قالب العملاء بنجاح', 'success');
+
+    } catch (error) {
+        console.error('خطأ في تحميل القالب:', error);
+        showNotification('خطأ في تحميل القالب', 'error');
+    }
+}
+
+// ===== وظائف تصدير واستيراد الموردين =====
+
+// تصدير الموردين إلى ملف CSV
+function exportSuppliersToCSV() {
+    try {
+        if (!window.db) {
+            showNotification('قاعدة البيانات غير متاحة', 'error');
+            return;
+        }
+
+        const suppliers = db.getTable('suppliers');
+
+        if (suppliers.length === 0) {
+            showNotification('لا توجد موردين للتصدير', 'warning');
+            return;
+        }
+
+        // تحضير البيانات للتصدير
+        const csvData = [];
+
+        // إضافة الرؤوس باللغة العربية
+        const headers = [
+            'المعرف',
+            'اسم المورد',
+            'رقم الهاتف',
+            'البريد الإلكتروني',
+            'العنوان',
+            'الرصيد الحالي',
+            'ملاحظات',
+            'تاريخ الإنشاء'
+        ];
+
+        csvData.push(headers);
+
+        // إضافة بيانات الموردين
+        suppliers.forEach(supplier => {
+            const row = [
+                supplier.id || '',
+                supplier.name || '',
+                supplier.phone || '',
+                supplier.email || '',
+                supplier.address || '',
+                supplier.balance || 0,
+                supplier.notes || '',
+                supplier.createdAt ? new Date(supplier.createdAt).toLocaleDateString('ar-SA') : ''
+            ];
+
+            csvData.push(row);
+        });
+
+        // تحويل البيانات إلى CSV
+        const csvContent = csvData.map(row =>
+            row.map(field => {
+                const cleanField = String(field).replace(/"/g, '""');
+                return cleanField.includes(',') || cleanField.includes('\n') || cleanField.includes('"')
+                    ? `"${cleanField}"`
+                    : cleanField;
+            }).join(',')
+        ).join('\n');
+
+        // إنشاء اسم الملف مع التاريخ
+        const today = new Date();
+        const dateStr = today.getFullYear() + '-' +
+                       String(today.getMonth() + 1).padStart(2, '0') + '-' +
+                       String(today.getDate()).padStart(2, '0');
+        const filename = `suppliers_export_${dateStr}.csv`;
+
+        // تحميل الملف
+        downloadCSVFile(csvContent, filename);
+
+        showNotification(`تم تصدير ${suppliers.length} مورد بنجاح`, 'success');
+
+    } catch (error) {
+        console.error('خطأ في تصدير الموردين:', error);
+        showNotification('خطأ في تصدير الموردين', 'error');
+    }
+}
+
+// عرض نافذة استيراد الموردين
+function showImportSuppliersModal() {
+    const content = `
+        <div class="import-suppliers-form">
+            <div class="form-group">
+                <label class="form-label">اختر ملف CSV للاستيراد</label>
+                <div class="file-input-container">
+                    <input type="file" id="importSuppliersFile" accept=".csv" class="file-input">
+                    <label for="importSuppliersFile" class="file-input-label">
+                        <i class="fas fa-upload"></i>
+                        اختر ملف CSV
+                    </label>
+                </div>
+                <small class="form-help">يجب أن يكون الملف بصيغة CSV ويحتوي على الحقول المطلوبة</small>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">خيارات الاستيراد</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="skipDuplicateSuppliers" checked>
+                        <span class="checkmark"></span>
+                        تخطي الموردين المكررين (بناءً على رقم الهاتف)
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="updateExistingSuppliers">
+                        <span class="checkmark"></span>
+                        تحديث الموردين الموجودين
+                    </label>
+                </div>
+            </div>
+
+            <div id="importSuppliersProgress" class="import-progress hidden">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="suppliersProgressFill"></div>
+                </div>
+                <div class="progress-text" id="suppliersProgressText">جاري المعالجة...</div>
+            </div>
+
+            <div id="importSuppliersResults" class="import-results hidden">
+                <h4>نتائج الاستيراد</h4>
+                <div id="importSuppliersSummary"></div>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-primary" onclick="processSuppliersImport()">
+                    <i class="fas fa-upload"></i>
+                    بدء الاستيراد
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">
+                    إلغاء
+                </button>
+            </div>
+        </div>
+    `;
+
+    showModal('استيراد الموردين', content);
+}
+
+// معالجة استيراد الموردين
+function processSuppliersImport() {
+    try {
+        const fileInput = document.getElementById('importSuppliersFile');
+        const skipDuplicates = document.getElementById('skipDuplicateSuppliers').checked;
+        const updateExisting = document.getElementById('updateExistingSuppliers').checked;
+
+        if (!fileInput.files || fileInput.files.length === 0) {
+            showNotification('يرجى اختيار ملف CSV للاستيراد', 'warning');
+            return;
+        }
+
+        const file = fileInput.files[0];
+
+        if (!file.name.toLowerCase().endsWith('.csv')) {
+            showNotification('يرجى اختيار ملف CSV صحيح', 'error');
+            return;
+        }
+
+        // إظهار شريط التقدم
+        document.getElementById('importSuppliersProgress').classList.remove('hidden');
+        document.getElementById('importSuppliersResults').classList.add('hidden');
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const csvContent = e.target.result;
+                importSuppliersFromCSV(csvContent, skipDuplicates, updateExisting);
+            } catch (error) {
+                console.error('خطأ في قراءة الملف:', error);
+                showNotification('خطأ في قراءة الملف', 'error');
+                document.getElementById('importSuppliersProgress').classList.add('hidden');
+            }
+        };
+
+        reader.onerror = function() {
+            showNotification('خطأ في قراءة الملف', 'error');
+            document.getElementById('importSuppliersProgress').classList.add('hidden');
+        };
+
+        reader.readAsText(file, 'UTF-8');
+
+    } catch (error) {
+        console.error('خطأ في معالجة الاستيراد:', error);
+        showNotification('خطأ في معالجة الاستيراد', 'error');
+    }
+}
+
+// استيراد الموردين من محتوى CSV
+function importSuppliersFromCSV(csvContent, skipDuplicates, updateExisting) {
+    try {
+        const lines = csvContent.split('\n').filter(line => line.trim());
+
+        if (lines.length < 2) {
+            showNotification('الملف فارغ أو لا يحتوي على بيانات صحيحة', 'error');
+            document.getElementById('importSuppliersProgress').classList.add('hidden');
+            return;
+        }
+
+        const headers = lines[0].split(',').map(header => header.trim().replace(/"/g, ''));
+        const dataLines = lines.slice(1);
+
+        // التحقق من الحقول المطلوبة
+        const requiredFields = ['اسم المورد'];
+        const missingFields = requiredFields.filter(field => !headers.includes(field));
+
+        if (missingFields.length > 0) {
+            showNotification(`الحقول المطلوبة مفقودة: ${missingFields.join(', ')}`, 'error');
+            document.getElementById('importSuppliersProgress').classList.add('hidden');
+            return;
+        }
+
+        const existingSuppliers = db.getTable('suppliers');
+
+        let imported = 0;
+        let updated = 0;
+        let skipped = 0;
+        let errors = 0;
+        const errorMessages = [];
+
+        // معالجة كل سطر
+        dataLines.forEach((line, index) => {
+            try {
+                const values = parseCSVLine(line);
+
+                if (values.length !== headers.length) {
+                    errors++;
+                    errorMessages.push(`السطر ${index + 2}: عدد الأعمدة غير متطابق`);
+                    return;
+                }
+
+                const supplierData = {};
+                headers.forEach((header, i) => {
+                    supplierData[header] = values[i];
+                });
+
+                // التحقق من البيانات المطلوبة
+                if (!supplierData['اسم المورد'] || !supplierData['اسم المورد'].trim()) {
+                    errors++;
+                    errorMessages.push(`السطر ${index + 2}: اسم المورد مطلوب`);
+                    return;
+                }
+
+                // البحث عن مورد موجود بنفس رقم الهاتف
+                const phone = supplierData['رقم الهاتف'] || '';
+                const existingSupplier = phone ? existingSuppliers.find(s => s.phone === phone) : null;
+
+                if (existingSupplier) {
+                    if (skipDuplicates && !updateExisting) {
+                        skipped++;
+                        return;
+                    }
+
+                    if (updateExisting) {
+                        // تحديث المورد الموجود
+                        const updatedSupplier = {
+                            ...existingSupplier,
+                            name: supplierData['اسم المورد'].trim(),
+                            phone: supplierData['رقم الهاتف'] || existingSupplier.phone || '',
+                            email: supplierData['البريد الإلكتروني'] || existingSupplier.email || '',
+                            address: supplierData['العنوان'] || existingSupplier.address || '',
+                            balance: parseFloat(supplierData['الرصيد الحالي']) || existingSupplier.balance || 0,
+                            notes: supplierData['ملاحظات'] || existingSupplier.notes || '',
+                            updatedAt: new Date().toISOString()
+                        };
+
+                        db.update('suppliers', existingSupplier.id, updatedSupplier);
+                        updated++;
+                    } else {
+                        skipped++;
+                    }
+                } else {
+                    // إضافة مورد جديد
+                    const newSupplier = {
+                        id: 'supplier_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
+                        name: supplierData['اسم المورد'].trim(),
+                        phone: supplierData['رقم الهاتف'] || '',
+                        email: supplierData['البريد الإلكتروني'] || '',
+                        address: supplierData['العنوان'] || '',
+                        balance: parseFloat(supplierData['الرصيد الحالي']) || 0,
+                        notes: supplierData['ملاحظات'] || '',
+                        createdAt: new Date().toISOString()
+                    };
+
+                    db.insert('suppliers', newSupplier);
+                    imported++;
+                }
+
+                // تحديث شريط التقدم
+                const progress = ((index + 1) / dataLines.length) * 100;
+                document.getElementById('suppliersProgressFill').style.width = progress + '%';
+                document.getElementById('suppliersProgressText').textContent = `معالجة السطر ${index + 1} من ${dataLines.length}`;
+
+            } catch (error) {
+                errors++;
+                errorMessages.push(`السطر ${index + 2}: ${error.message}`);
+            }
+        });
+
+        // إخفاء شريط التقدم وإظهار النتائج
+        document.getElementById('importSuppliersProgress').classList.add('hidden');
+        document.getElementById('importSuppliersResults').classList.remove('hidden');
+
+        const summaryHTML = `
+            <div class="import-summary">
+                <div class="summary-item success">
+                    <i class="fas fa-check-circle"></i>
+                    <span>تم استيراد: ${imported} مورد</span>
+                </div>
+                <div class="summary-item info">
+                    <i class="fas fa-edit"></i>
+                    <span>تم تحديث: ${updated} مورد</span>
+                </div>
+                <div class="summary-item warning">
+                    <i class="fas fa-skip-forward"></i>
+                    <span>تم تخطي: ${skipped} مورد</span>
+                </div>
+                <div class="summary-item error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>أخطاء: ${errors}</span>
+                </div>
+            </div>
+            ${errorMessages.length > 0 ? `
+                <div class="error-details">
+                    <h5>تفاصيل الأخطاء:</h5>
+                    <ul>
+                        ${errorMessages.slice(0, 10).map(msg => `<li>${msg}</li>`).join('')}
+                        ${errorMessages.length > 10 ? `<li>... و ${errorMessages.length - 10} أخطاء أخرى</li>` : ''}
+                    </ul>
+                </div>
+            ` : ''}
+        `;
+
+        document.getElementById('importSuppliersSummary').innerHTML = summaryHTML;
+
+        if (imported > 0 || updated > 0) {
+            showNotification(`تم الاستيراد بنجاح: ${imported} جديد، ${updated} محدث`, 'success');
+
+            // إعادة تحميل الموردين
+            setTimeout(() => {
+                if (typeof loadSuppliers === 'function') {
+                    loadSuppliers();
+                }
+            }, 1000);
+        } else if (errors > 0) {
+            showNotification('فشل في الاستيراد بسبب أخطاء في البيانات', 'error');
+        } else {
+            showNotification('لم يتم استيراد أي موردين جدد', 'info');
+        }
+
+    } catch (error) {
+        console.error('خطأ في معالجة CSV:', error);
+        showNotification('خطأ في معالجة ملف CSV', 'error');
+        document.getElementById('importSuppliersProgress').classList.add('hidden');
+    }
+}
+
+// تحميل قالب CSV للموردين
+function downloadSuppliersTemplate() {
+    try {
+        // إنشاء قالب CSV مع الحقول الأساسية
+        const headers = [
+            'اسم المورد',
+            'رقم الهاتف',
+            'البريد الإلكتروني',
+            'الرصيد الحالي',
+            'العنوان',
+            'ملاحظات'
+        ];
+
+        // إضافة صف مثال
+        const exampleRow = [
+            'شركة الخليج للإلكترونيات',
+            '+965 2222 3333',
+            'gulf@electronics.com',
+            '0',
+            'الكويت - حولي - شارع الخليج العربي',
+            'مورد موثوق للأجهزة الإلكترونية'
+        ];
+
+        // تحضير محتوى CSV
+        const csvData = [headers, exampleRow];
+        const csvContent = csvData.map(row =>
+            row.map(field => {
+                const cleanField = String(field).replace(/"/g, '""');
+                return cleanField.includes(',') || cleanField.includes('\n') || cleanField.includes('"')
+                    ? `"${cleanField}"`
+                    : cleanField;
+            }).join(',')
+        ).join('\n');
+
+        // تحميل الملف
+        downloadCSVFile(csvContent, 'suppliers_template.csv');
+
+        showNotification('تم تحميل قالب الموردين بنجاح', 'success');
+
+    } catch (error) {
+        console.error('خطأ في تحميل القالب:', error);
+        showNotification('خطأ في تحميل القالب', 'error');
     }
 }
 
@@ -2877,9 +4720,6 @@ function updateCartSummary() {
     const discountRateInput = document.getElementById('discountRate');
     const discountAmountInput = document.getElementById('discountAmount');
 
-    const settings = db.getTable('settings');
-    const defaultTaxRate = settings.taxRate ?? 15;
-
     // تحديد نسبة الضريبة (مخصصة فقط - لا تطبيق تلقائي)
     let taxRate = 0;
     if (customTaxRateInput && customTaxRateInput.value !== '') {
@@ -3282,10 +5122,24 @@ function loadCustomersSection() {
     section.innerHTML = `
         <div class="section-header">
             <h2><i class="fas fa-users"></i> إدارة العملاء</h2>
-            <button class="btn btn-primary" onclick="showAddCustomerModal()">
-                <i class="fas fa-plus"></i>
-                إضافة عميل جديد
-            </button>
+            <div class="section-actions">
+                <button class="btn btn-primary" onclick="showAddCustomerModal()">
+                    <i class="fas fa-plus"></i>
+                    إضافة عميل جديد
+                </button>
+                <button class="btn btn-success" onclick="exportCustomersToCSV()" title="تصدير جميع العملاء إلى ملف CSV">
+                    <i class="fas fa-download"></i>
+                    تصدير
+                </button>
+                <button class="btn btn-info" onclick="showImportCustomersModal()" title="استيراد العملاء من ملف CSV">
+                    <i class="fas fa-upload"></i>
+                    استيراد
+                </button>
+                <button class="btn btn-warning" onclick="downloadCustomersTemplate()" title="تحميل قالب CSV لإدخال العملاء">
+                    <i class="fas fa-file-csv"></i>
+                    قالب
+                </button>
+            </div>
         </div>
 
         <div class="filters-container">
@@ -4049,13 +5903,13 @@ function editInvoiceFromHistory(invoiceId, type) {
 
         // عرض تبويب الفواتير السابقة
         setTimeout(() => {
-            showSalesTab('previous');
+            showSalesTab('history');
 
             // البحث عن الفاتورة وفتحها للتعديل
             setTimeout(() => {
                 const sale = db.findById('sales', invoiceId);
                 if (sale) {
-                    editSale(invoiceId);
+                    editInvoice(invoiceId);
                 }
             }, 500);
         }, 300);
@@ -4575,10 +6429,24 @@ function loadSuppliersSection() {
     section.innerHTML = `
         <div class="section-header">
             <h2><i class="fas fa-truck"></i> إدارة الموردين</h2>
-            <button class="btn btn-primary" onclick="showAddSupplierModal()">
-                <i class="fas fa-plus"></i>
-                إضافة مورد جديد
-            </button>
+            <div class="section-actions">
+                <button class="btn btn-primary" onclick="showAddSupplierModal()">
+                    <i class="fas fa-plus"></i>
+                    إضافة مورد جديد
+                </button>
+                <button class="btn btn-success" onclick="exportSuppliersToCSV()" title="تصدير جميع الموردين إلى ملف CSV">
+                    <i class="fas fa-download"></i>
+                    تصدير
+                </button>
+                <button class="btn btn-info" onclick="showImportSuppliersModal()" title="استيراد الموردين من ملف CSV">
+                    <i class="fas fa-upload"></i>
+                    استيراد
+                </button>
+                <button class="btn btn-warning" onclick="downloadSuppliersTemplate()" title="تحميل قالب CSV لإدخال الموردين">
+                    <i class="fas fa-file-csv"></i>
+                    قالب
+                </button>
+            </div>
         </div>
 
         <div class="filters-container">
@@ -6009,7 +7877,6 @@ let purchaseWarehouseEventHandler = null;
 // عرض نافذة إضافة فاتورة شراء مع التحديث الفوري للمخازن
 function showAddPurchaseModal() {
     const suppliers = db.getTable('suppliers');
-    const products = db.getTable('products');
 
     if (suppliers.length === 0) {
         showNotification('يجب إضافة موردين أولاً', 'warning');
@@ -6351,7 +8218,7 @@ function updateWarehouseDistribution() {
 
     // حفظ القيم الحالية قبل إعادة الإنشاء
     const currentValues = {};
-    validItems.forEach((item, itemIndex) => {
+    validItems.forEach((_, itemIndex) => {
         currentValues[itemIndex] = {};
         warehouses.forEach(warehouse => {
             const input = document.getElementById(`dist_${itemIndex}_${warehouse.id}`);
@@ -6400,7 +8267,7 @@ function updateWarehouseDistribution() {
     }).join('');
 
     // إعادة حساب التوزيع للعناصر الموجودة
-    validItems.forEach((item, itemIndex) => {
+    validItems.forEach((_, itemIndex) => {
         validateDistribution(itemIndex);
     });
 
@@ -8085,6 +9952,10 @@ function loadReportsSection() {
         <div class="section-header">
             <h2><i class="fas fa-chart-bar"></i> التقارير والإحصائيات</h2>
             <div class="header-actions">
+                <button class="btn btn-success" onclick="exportAllDataToZip()" title="تصدير جميع البيانات في ملف ZIP">
+                    <i class="fas fa-download"></i>
+                    تصدير شامل
+                </button>
                 <button class="btn btn-info" onclick="generateAllReports()">
                     <i class="fas fa-file-alt"></i>
                     تقرير شامل
@@ -10113,8 +11984,9 @@ function loadWarehousesSection() {
 // تحميل نظرة عامة على المخازن
 function loadWarehousesOverview() {
     try {
-        const warehouses = db.getTable('warehouses');
+        const warehouses = db.getTable('warehouses').filter(w => w.isActive);
         const products = db.getTable('products');
+        const settings = db.getTable('settings');
         const overviewContainer = document.getElementById('warehousesOverview');
 
         if (!overviewContainer) return;
@@ -10122,25 +11994,54 @@ function loadWarehousesOverview() {
         let totalProducts = 0;
         let totalValue = 0;
         let lowStockItems = 0;
+        const lowStockThreshold = settings.lowStockThreshold || 5;
 
         products.forEach(product => {
-            const totalQuantity = Object.values(product.warehouses || {}).reduce((sum, qty) => sum + qty, 0);
-            totalProducts += totalQuantity;
-            totalValue += totalQuantity * product.price;
+            let productTotalQuantity = 0;
+            const threshold = product.minStock || lowStockThreshold;
+            let hasLowStock = false;
 
-            if (totalQuantity <= (product.minQuantity || 5)) {
+            // حساب الكمية الإجمالية من توزيع المخازن
+            if (product.warehouseDistribution && warehouses.length > 0) {
+                warehouses.forEach(warehouse => {
+                    const warehouseQty = product.warehouseDistribution[warehouse.id] || 0;
+                    productTotalQuantity += warehouseQty;
+
+                    // فحص إذا كان المنتج منخفض المخزون في أي مخزن
+                    if (warehouseQty <= threshold) {
+                        hasLowStock = true;
+                    }
+                });
+            } else {
+                // إذا لم يكن هناك توزيع مخازن، استخدم الكمية الإجمالية
+                productTotalQuantity = product.quantity || 0;
+                if (productTotalQuantity <= threshold) {
+                    hasLowStock = true;
+                }
+            }
+
+            totalProducts += productTotalQuantity;
+
+            // حساب القيمة بناءً على سعر البيع
+            const salePrice = product.salePrice || 0;
+            totalValue += productTotalQuantity * salePrice;
+
+            if (hasLowStock) {
                 lowStockItems++;
             }
         });
 
         overviewContainer.innerHTML = `
-            <div class="overview-card">
+            <div class="overview-card clickable-card" onclick="showWarehousesList()">
                 <div class="card-icon">
                     <i class="fas fa-warehouse"></i>
                 </div>
                 <div class="card-info">
-                    <h3>${db.toArabicNumbers(warehouses.length)}</h3>
+                    <h3>${toArabicNumbers(warehouses.length)}</h3>
                     <p>إجمالي المخازن</p>
+                </div>
+                <div class="card-action-hint">
+                    <i class="fas fa-external-link-alt"></i>
                 </div>
             </div>
 
@@ -10149,7 +12050,7 @@ function loadWarehousesOverview() {
                     <i class="fas fa-boxes"></i>
                 </div>
                 <div class="card-info">
-                    <h3>${db.toArabicNumbers(totalProducts)}</h3>
+                    <h3>${toArabicNumbers(totalProducts)}</h3>
                     <p>إجمالي المخزون</p>
                 </div>
             </div>
@@ -10164,19 +12065,38 @@ function loadWarehousesOverview() {
                 </div>
             </div>
 
-            <div class="overview-card ${lowStockItems > 0 ? 'warning' : ''}">
+            <div class="overview-card clickable-card ${lowStockItems > 0 ? 'warning' : ''}" onclick="showLowStockDetails()">
                 <div class="card-icon">
                     <i class="fas fa-exclamation-triangle"></i>
                 </div>
                 <div class="card-info">
-                    <h3>${db.toArabicNumbers(lowStockItems)}</h3>
+                    <h3>${toArabicNumbers(lowStockItems)}</h3>
                     <p>منتجات منخفضة</p>
+                </div>
+                <div class="card-action-hint">
+                    <i class="fas fa-external-link-alt"></i>
                 </div>
             </div>
         `;
 
     } catch (error) {
         console.error('خطأ في تحميل نظرة عامة المخازن:', error);
+    }
+}
+
+// عرض قائمة المخازن
+function showWarehousesList() {
+    try {
+        // التبديل إلى تبويب النظرة العامة إذا لم يكن نشطاً
+        showWarehouseTab('overview');
+
+        // التمرير إلى شبكة المخازن
+        const warehousesGrid = document.getElementById('warehousesGrid');
+        if (warehousesGrid) {
+            warehousesGrid.scrollIntoView({ behavior: 'smooth' });
+        }
+    } catch (error) {
+        console.error('خطأ في عرض قائمة المخازن:', error);
     }
 }
 

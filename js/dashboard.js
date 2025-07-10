@@ -483,7 +483,451 @@ function showLowStockDetails() {
     }
 }
 
+// عرض تفاصيل المخزون المنخفض - نسخة محسنة مع حساب مباشر
+function showLowStockDetailsFixed() {
+    try {
+        if (!window.db) {
+            showNotification('قاعدة البيانات غير متاحة', 'error');
+            return;
+        }
+
+        console.log('🔍 بدء عرض تقرير المخزون المنخفض المحسن...');
+
+        // حساب مباشر للمخزون المنخفض بدلاً من الاعتماد على getQuickStats
+        const warehouses = db.getTable('warehouses').filter(w => w.isActive);
+        const products = db.getTable('products');
+        const settings = db.getTable('settings');
+        const lowStockThreshold = settings.lowStockThreshold || 5;
+
+        console.log(`📊 البيانات: ${warehouses.length} مخازن، ${products.length} منتجات، حد التنبيه: ${lowStockThreshold}`);
+
+        const allLowStockDetails = [];
+
+        // حساب مباشر للمخزون المنخفض
+        products.forEach(product => {
+            const threshold = product.minStock || lowStockThreshold;
+
+            if (product.warehouseDistribution && warehouses.length > 0) {
+                warehouses.forEach(warehouse => {
+                    const warehouseQty = product.warehouseDistribution[warehouse.id] || 0;
+
+                    if (warehouseQty <= threshold) {
+                        allLowStockDetails.push({
+                            productId: product.id,
+                            productName: product.name,
+                            warehouseId: warehouse.id,
+                            warehouseName: warehouse.name,
+                            quantity: warehouseQty,
+                            threshold: threshold,
+                            status: warehouseQty === 0 ? 'out-of-stock' : 'low-stock'
+                        });
+
+                        console.log(`⚠️ منتج منخفض: ${product.name} في ${warehouse.name}: ${warehouseQty}/${threshold}`);
+                    }
+                });
+            } else {
+                // إذا لم يكن هناك توزيع مخازن، فحص الكمية الإجمالية
+                const totalQuantity = product.quantity || 0;
+                if (totalQuantity <= threshold) {
+                    allLowStockDetails.push({
+                        productId: product.id,
+                        productName: product.name,
+                        warehouseId: 'main',
+                        warehouseName: 'المخزن الرئيسي',
+                        quantity: totalQuantity,
+                        threshold: threshold,
+                        status: totalQuantity === 0 ? 'out-of-stock' : 'low-stock'
+                    });
+
+                    console.log(`⚠️ منتج منخفض (رئيسي): ${product.name}: ${totalQuantity}/${threshold}`);
+                }
+            }
+        });
+
+        console.log(`📋 إجمالي العناصر منخفضة المخزون: ${allLowStockDetails.length}`);
+
+        if (allLowStockDetails.length === 0) {
+            showNotification('لا توجد منتجات منخفضة المخزون', 'info');
+            return;
+        }
+
+        // تجميع المنتجات حسب المخزن
+        const warehouseGroups = {};
+        allLowStockDetails.forEach(item => {
+            if (!warehouseGroups[item.warehouseId]) {
+                warehouseGroups[item.warehouseId] = {
+                    id: item.warehouseId,
+                    name: item.warehouseName,
+                    items: []
+                };
+            }
+            warehouseGroups[item.warehouseId].items.push(item);
+        });
+
+        console.log(`🏪 المخازن المتأثرة: ${Object.keys(warehouseGroups).length}`);
+        Object.values(warehouseGroups).forEach(warehouse => {
+            console.log(`  - ${warehouse.name}: ${warehouse.items.length} منتج`);
+        });
+
+        const content = `
+            <div class="low-stock-report-fixed">
+                <div class="low-stock-header">
+                    <h2 class="low-stock-title">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        تقرير المخزون المنخفض - محسن
+                    </h2>
+                    <button class="btn btn-secondary" onclick="closeModal()">
+                        <i class="fas fa-times"></i>
+                        إغلاق
+                    </button>
+                </div>
+
+                <div class="low-stock-summary">
+                    <div class="low-stock-summary-card">
+                        <h3>${toArabicNumbers(allLowStockDetails.length)}</h3>
+                        <p>إجمالي العناصر المنخفضة</p>
+                    </div>
+                    <div class="low-stock-summary-card">
+                        <h3>${toArabicNumbers(Object.keys(warehouseGroups).length)}</h3>
+                        <p>المخازن المتأثرة</p>
+                    </div>
+                    <div class="low-stock-summary-card">
+                        <h3>${toArabicNumbers(lowStockThreshold)}</h3>
+                        <p>حد التنبيه الحالي</p>
+                    </div>
+                </div>
+
+                ${Object.values(warehouseGroups).map(warehouse => `
+                    <div class="warehouse-section">
+                        <div class="warehouse-section-header">
+                            <h3 class="warehouse-section-title">${warehouse.name}</h3>
+                            <span class="warehouse-section-count">${toArabicNumbers(warehouse.items.length)} منتج</span>
+                        </div>
+
+                        <div class="low-stock-table-container">
+                            <table class="low-stock-table">
+                                <thead>
+                                    <tr>
+                                        <th>اسم المنتج</th>
+                                        <th>الكمية الحالية</th>
+                                        <th>الحد الأدنى</th>
+                                        <th>الحالة</th>
+                                        <th>الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${warehouse.items.map(item => `
+                                        <tr>
+                                            <td class="product-name">${item.productName}</td>
+                                            <td class="current-qty">${toArabicNumbers(item.quantity)}</td>
+                                            <td class="threshold-qty">${toArabicNumbers(item.threshold)}</td>
+                                            <td>
+                                                <span class="stock-status-badge ${item.status}">
+                                                    ${item.status === 'out-of-stock' ? 'نفد المخزون' : 'مخزون منخفض'}
+                                                </span>
+                                            </td>
+                                            <td class="actions">
+                                                <button class="btn btn-sm btn-primary" onclick="adjustInventory('${item.productId}')">
+                                                    <i class="fas fa-edit"></i>
+                                                    تعديل المخزون
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        showModal('تقرير المخزون المنخفض - محسن', content, 'large');
+        console.log('✅ تم عرض تقرير المخزون المنخفض المحسن بنجاح');
+
+    } catch (error) {
+        console.error('خطأ في عرض تفاصيل المخزون المنخفض المحسن:', error);
+        showNotification('خطأ في تحميل تفاصيل المخزون المنخفض المحسن', 'error');
+    }
+}
+
+// تعديل المخزون للمنتج
+function adjustInventory(productId) {
+    try {
+        if (!window.db) return;
+
+        const product = db.getTable('products').find(p => p.id === productId);
+        if (!product) {
+            showNotification('المنتج غير موجود', 'error');
+            return;
+        }
+
+        // الانتقال إلى صفحة المنتجات وفتح نافذة التعديل
+        if (typeof showSection === 'function') {
+            showSection('products');
+            setTimeout(() => {
+                if (typeof editProduct === 'function') {
+                    editProduct(productId);
+                } else {
+                    showNotification('وظيفة تعديل المنتج غير متاحة', 'warning');
+                }
+            }, 500);
+        } else {
+            showNotification('وظيفة التنقل غير متاحة', 'error');
+        }
+    } catch (error) {
+        console.error('خطأ في تعديل المخزون:', error);
+        showNotification('خطأ في تعديل المخزون', 'error');
+    }
+}
+
+// نقل المخزون (وظيفة مستقبلية)
+function transferInventory(productId) {
+    try {
+        showNotification('وظيفة نقل المخزون قيد التطوير', 'info');
+    } catch (error) {
+        console.error('خطأ في نقل المخزون:', error);
+        showNotification('خطأ في نقل المخزون', 'error');
+    }
+}
+
+// ===== وظائف مساعدة =====
+
+// تحويل الأرقام إلى العربية
+function toArabicNumbers(num) {
+    if (num === null || num === undefined) return '٠';
+
+    const arabicNumbers = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    return num.toString().replace(/[0-9]/g, function(w) {
+        return arabicNumbers[+w];
+    });
+}
+
+// تنسيق العملة
+function formatCurrency(amount) {
+    if (amount === null || amount === undefined || isNaN(amount)) return '٠.٠٠٠ د.ك';
+
+    const formatted = parseFloat(amount).toFixed(3);
+    const arabicFormatted = toArabicNumbers(formatted);
+    return arabicFormatted + ' د.ك';
+}
+
+// ===== وظائف الروابط للبطاقات =====
+
+// الانتقال إلى صفحة المنتجات
+function goToProducts() {
+    try {
+        if (typeof showSection === 'function') {
+            showSection('products');
+        } else if (typeof loadSectionContent === 'function') {
+            loadSectionContent('products');
+        } else {
+            console.warn('وظيفة التنقل إلى المنتجات غير متاحة');
+        }
+    } catch (error) {
+        console.error('خطأ في الانتقال إلى صفحة المنتجات:', error);
+    }
+}
+
+// الانتقال إلى صفحة العملاء
+function goToCustomers() {
+    try {
+        if (typeof showSection === 'function') {
+            showSection('customers');
+        } else if (typeof loadSectionContent === 'function') {
+            loadSectionContent('customers');
+        } else {
+            console.warn('وظيفة التنقل إلى العملاء غير متاحة');
+        }
+    } catch (error) {
+        console.error('خطأ في الانتقال إلى صفحة العملاء:', error);
+    }
+}
+
+// الانتقال إلى صفحة المبيعات
+function goToSales() {
+    try {
+        if (typeof showSection === 'function') {
+            showSection('sales');
+        } else if (typeof loadSectionContent === 'function') {
+            loadSectionContent('sales');
+        } else {
+            console.warn('وظيفة التنقل إلى المبيعات غير متاحة');
+        }
+    } catch (error) {
+        console.error('خطأ في الانتقال إلى صفحة المبيعات:', error);
+    }
+}
+
+// الانتقال إلى صفحة الفواتير السابقة
+function goToSalesHistory() {
+    try {
+        if (typeof showSection === 'function') {
+            showSection('sales');
+            // تأخير بسيط للتأكد من تحميل القسم
+            setTimeout(() => {
+                if (typeof showSalesTab === 'function') {
+                    showSalesTab('history');
+                }
+            }, 300);
+        } else if (typeof loadSectionContent === 'function') {
+            loadSectionContent('sales');
+            setTimeout(() => {
+                if (typeof showSalesTab === 'function') {
+                    showSalesTab('history');
+                }
+            }, 300);
+        } else {
+            console.warn('وظيفة التنقل إلى الفواتير السابقة غير متاحة');
+        }
+    } catch (error) {
+        console.error('خطأ في الانتقال إلى صفحة الفواتير السابقة:', error);
+    }
+}
+
+// الانتقال إلى تقرير المخزون المنخفض
+function goToLowStockReport() {
+    try {
+        // عرض تفاصيل المخزون المنخفض في نافذة منبثقة
+        showLowStockDetails();
+    } catch (error) {
+        console.error('خطأ في عرض تقرير المخزون المنخفض:', error);
+    }
+}
+
+// إصلاح توزيع المخازن للمنتجات
+function fixWarehouseDistribution() {
+    try {
+        if (!window.db) {
+            console.log('❌ قاعدة البيانات غير متاحة');
+            return;
+        }
+
+        console.log('🔧 بدء إصلاح توزيع المخازن...');
+
+        const products = db.getTable('products');
+        const warehouses = db.getTable('warehouses').filter(w => w.isActive);
+
+        let fixedCount = 0;
+
+        products.forEach(product => {
+            let needsUpdate = false;
+
+            // إذا لم يكن للمنتج توزيع مخازن، أنشئ واحد
+            if (!product.warehouseDistribution && warehouses.length > 0) {
+                product.warehouseDistribution = {};
+                warehouses.forEach(warehouse => {
+                    product.warehouseDistribution[warehouse.id] = 0;
+                });
+                needsUpdate = true;
+                console.log(`📦 تم إنشاء توزيع مخازن للمنتج: ${product.name}`);
+            }
+
+            // تأكد من وجود جميع المخازن النشطة في التوزيع
+            if (product.warehouseDistribution && warehouses.length > 0) {
+                warehouses.forEach(warehouse => {
+                    if (!(warehouse.id in product.warehouseDistribution)) {
+                        product.warehouseDistribution[warehouse.id] = 0;
+                        needsUpdate = true;
+                        console.log(`🏪 تم إضافة المخزن ${warehouse.name} للمنتج ${product.name}`);
+                    }
+                });
+
+                // حساب الكمية الإجمالية من التوزيع
+                const calculatedTotal = Object.values(product.warehouseDistribution).reduce((sum, qty) => sum + (qty || 0), 0);
+                if (product.quantity !== calculatedTotal) {
+                    product.quantity = calculatedTotal;
+                    needsUpdate = true;
+                    console.log(`📊 تم تحديث الكمية الإجمالية للمنتج ${product.name}: ${calculatedTotal}`);
+                }
+            }
+
+            if (needsUpdate) {
+                db.update('products', product.id, product);
+                fixedCount++;
+            }
+        });
+
+        console.log(`✅ تم إصلاح ${fixedCount} منتج`);
+        return fixedCount;
+
+    } catch (error) {
+        console.error('❌ خطأ في إصلاح توزيع المخازن:', error);
+        return 0;
+    }
+}
+
+// وظيفة تشخيص المخزون المنخفض
+function diagnoseLowStock() {
+    try {
+        if (!window.db) {
+            console.log('❌ قاعدة البيانات غير متاحة');
+            return;
+        }
+
+        console.log('🔍 بدء تشخيص المخزون المنخفض...');
+
+        const products = db.getTable('products');
+        const warehouses = db.getTable('warehouses').filter(w => w.isActive);
+        const settings = db.getTable('settings');
+        const lowStockThreshold = settings.lowStockThreshold || 5;
+
+        console.log(`📦 عدد المنتجات: ${products.length}`);
+        console.log(`🏪 عدد المخازن النشطة: ${warehouses.length}`);
+        console.log(`⚠️ حد التنبيه: ${lowStockThreshold}`);
+
+        warehouses.forEach(warehouse => {
+            console.log(`🏪 مخزن: ${warehouse.name} (${warehouse.id})`);
+        });
+
+        products.forEach(product => {
+            const threshold = product.minStock || lowStockThreshold;
+            console.log(`\n📦 منتج: ${product.name}`);
+            console.log(`   - الحد الأدنى: ${threshold}`);
+            console.log(`   - الكمية الإجمالية: ${product.quantity || 0}`);
+
+            if (product.warehouseDistribution) {
+                console.log(`   - توزيع المخازن:`);
+                Object.entries(product.warehouseDistribution).forEach(([warehouseId, qty]) => {
+                    const warehouse = warehouses.find(w => w.id === warehouseId);
+                    const warehouseName = warehouse ? warehouse.name : 'مخزن غير معروف';
+                    const isLowStock = qty <= threshold;
+                    console.log(`     * ${warehouseName}: ${qty} ${isLowStock ? '⚠️ منخفض' : '✅ جيد'}`);
+                });
+            } else {
+                console.log(`   - لا يوجد توزيع مخازن`);
+            }
+        });
+
+        // تشغيل getQuickStats وعرض النتائج
+        const stats = db.getQuickStats();
+        console.log(`\n📊 نتائج getQuickStats:`);
+        console.log(`   - عدد المنتجات منخفضة المخزون: ${stats.lowStockItems}`);
+        console.log(`   - عدد تفاصيل المخزون المنخفض: ${stats.lowStockDetails.length}`);
+
+        console.log(`\n📋 تفاصيل المخزون المنخفض:`);
+        stats.lowStockDetails.forEach(item => {
+            console.log(`   - ${item.productName} في ${item.warehouseName}: ${item.quantity}/${item.threshold} (${item.status})`);
+        });
+
+        return stats;
+
+    } catch (error) {
+        console.error('❌ خطأ في تشخيص المخزون المنخفض:', error);
+    }
+}
+
 // تصدير الوظائف للاستخدام العام
 window.initDashboard = initDashboard;
 window.updateDashboard = updateDashboard;
 window.showLowStockDetails = showLowStockDetails;
+window.showLowStockDetailsFixed = showLowStockDetailsFixed;
+window.diagnoseLowStock = diagnoseLowStock;
+window.fixWarehouseDistribution = fixWarehouseDistribution;
+window.adjustInventory = adjustInventory;
+window.transferInventory = transferInventory;
+window.goToProducts = goToProducts;
+window.goToCustomers = goToCustomers;
+window.goToSales = goToSales;
+window.goToSalesHistory = goToSalesHistory;
+window.goToLowStockReport = goToLowStockReport;
