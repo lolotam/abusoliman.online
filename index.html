@@ -30,8 +30,13 @@
 
                 <div class="input-group">
                     <label for="password">كلمة المرور</label>
-                    <input type="password" id="password" placeholder="أدخل كلمة المرور" required autocomplete="current-password">
-                    <i class="fas fa-lock"></i>
+                    <div class="password-input-wrapper">
+                        <input type="password" id="password" placeholder="أدخل كلمة المرور" required autocomplete="current-password">
+                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('password')">
+                            <i class="fas fa-eye" id="passwordToggleIcon"></i>
+                        </button>
+                    </div>
+                    <i class="fas fa-lock password-field-icon"></i>
                 </div>
 
                 <button type="submit" class="login-btn">
@@ -947,6 +952,9 @@
     <script src="js/purchases.js"></script>
     <script src="js/settings.js"></script>
     <script src="js/reports.js"></script>
+    <script src="test-fixes.js"></script>
+    <script src="debug-settings.js"></script>
+    <script src="quick-category-test.js"></script>
 
 
 </body>

@@ -119,10 +119,28 @@ function login(event) {
             return;
         }
 
-        // التحقق من كلمة المرور للنظام الجديد
-        if (user.id !== 'admin_legacy' && !verifyPassword(password, user.password)) {
-            showLoginError('كلمة المرور غير صحيحة');
-            return;
+        // التحقق من كلمة المرور
+        if (user.username === 'admin') {
+            // للمدير، تحقق من كلمة المرور المحفوظة في الإعدادات
+            const settings = db.getTable('settings');
+            if (settings && settings.adminPassword) {
+                if (password !== settings.adminPassword) {
+                    showLoginError('كلمة المرور غير صحيحة');
+                    return;
+                }
+            } else {
+                // إذا لم تكن هناك كلمة مرور في الإعدادات، استخدم النظام القديم
+                if (user.id !== 'admin_legacy' && !verifyPassword(password, user.password)) {
+                    showLoginError('كلمة المرور غير صحيحة');
+                    return;
+                }
+            }
+        } else {
+            // للمستخدمين الآخرين، استخدم النظام العادي
+            if (user.id !== 'admin_legacy' && !verifyPassword(password, user.password)) {
+                showLoginError('كلمة المرور غير صحيحة');
+                return;
+            }
         }
 
         // تحديث آخر تسجيل دخول
@@ -4571,7 +4589,7 @@ function updateWarehouseProducts() {
 }
 
 // متغير سلة المشتريات
-let cart = [];
+let globalCart = [];
 
 // إضافة منتج للسلة
 function addToCart(productId) {
@@ -4588,7 +4606,7 @@ function addToCart(productId) {
         }
 
         // البحث عن المنتج في السلة
-        const existingItem = cart.find(item => item.productId === productId);
+        const existingItem = globalCart.find(item => item.productId === productId);
 
         if (existingItem) {
             if (existingItem.quantity >= product.quantity) {
@@ -4597,7 +4615,7 @@ function addToCart(productId) {
             }
             existingItem.quantity++;
         } else {
-            cart.push({
+            globalCart.push({
                 productId: productId,
                 name: product.name,
                 price: product.price,
@@ -4621,7 +4639,7 @@ function updateCartDisplay() {
     const cartItems = document.getElementById('cartItems');
     if (!cartItems) return;
 
-    if (cart.length === 0) {
+    if (globalCart.length === 0) {
         cartItems.innerHTML = `
             <div class="empty-cart">
                 <i class="fas fa-shopping-cart"></i>
@@ -4629,7 +4647,7 @@ function updateCartDisplay() {
             </div>
         `;
     } else {
-        cartItems.innerHTML = cart.map((item, index) => `
+        cartItems.innerHTML = globalCart.map((item, index) => `
             <div class="cart-item">
                 <div class="cart-item-info">
                     <img class="cart-item-image" src="${item.image || DEFAULT_PRODUCT_IMAGE}" alt="${item.name}" loading="lazy">
@@ -6007,6 +6025,8 @@ function printCustomerStatement(customerId) {
 }
 
 // تحميل قسم الإعدادات
+// تم نقل هذه الدالة إلى js/settings.js
+/*
 function loadSettingsSection() {
     const section = document.getElementById('settings');
     if (!section) return;
@@ -6165,6 +6185,7 @@ function loadSettingsSection() {
         </div>
     `;
 }
+*/
 
 // عرض تبويب الإعدادات
 function showSettingsTab(tabName) {
@@ -8018,7 +8039,7 @@ function closePurchaseModal() {
 }
 
 // متغير لأصناف الشراء
-let purchaseItems = [];
+let globalPurchaseItems = [];
 
 // تصفية المنتجات حسب المورد المحدد
 function filterProductsBySupplier() {
@@ -8124,7 +8145,7 @@ function updatePurchaseItem(index) {
 
     const productId = productSelect.value;
     const quantity = parseFloat(quantityInput.value) || 0;
-    const price = parseFloat(priceInput.value) || 0;
+    let price = parseFloat(priceInput.value) || 0;
 
     // إذا تم اختيار منتج جديد، املأ السعر تلقائياً
     if (productId && !priceInput.value) {

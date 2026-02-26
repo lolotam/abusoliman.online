@@ -15,202 +15,362 @@ function loadSettingsSection() {
             <h2><i class="fas fa-cog"></i> الإعدادات</h2>
         </div>
         
-        <div class="settings-container">
-            <!-- إعدادات الشركة -->
-            <div class="settings-card">
-                <div class="settings-card-header">
-                    <h3><i class="fas fa-building"></i> معلومات الشركة</h3>
-                </div>
-                <div class="settings-card-body">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="companyName">اسم الشركة</label>
-                            <input type="text" id="companyName" value="${settings.companyName || ''}" onchange="updateCompanySetting('companyName', this.value)">
+        <!-- Settings Dashboard Layout -->
+        <div class="settings-dashboard">
+            <!-- Top Navigation Tabs -->
+            <div class="settings-nav">
+                <button class="settings-nav-btn active" onclick="switchSettingsTab('main')" data-tab="main">
+                    <i class="fas fa-cog"></i>
+                    <span>الإعدادات الأساسية</span>
+                </button>
+                <button class="settings-nav-btn" onclick="switchSettingsTab('security')" data-tab="security">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>الأمان</span>
+                </button>
+                <button class="settings-nav-btn" onclick="switchSettingsTab('data')" data-tab="data">
+                    <i class="fas fa-database"></i>
+                    <span>إدارة البيانات</span>
+                </button>
+                <button class="settings-nav-btn" onclick="switchSettingsTab('categories')" data-tab="categories">
+                    <i class="fas fa-tags"></i>
+                    <span>الفئات</span>
+                </button>
+            </div>
+
+            <!-- Main Settings Tab -->
+            <div class="settings-tab-content active" id="mainSettings">
+                <div class="settings-horizontal-layout">
+                    <!-- Company Info Panel -->
+                    <div class="settings-panel">
+                        <div class="panel-header">
+                            <div class="panel-icon">
+                                <i class="fas fa-building"></i>
+                            </div>
+                            <div class="panel-title">
+                                <h3>معلومات الشركة</h3>
+                                <p>بيانات الشركة الأساسية</p>
+                            </div>
                         </div>
-                        
-                        <div class="form-group">
-                            <label for="companyAddress">عنوان الشركة</label>
-                            <input type="text" id="companyAddress" value="${settings.companyAddress || ''}" onchange="updateCompanySetting('companyAddress', this.value)">
+                        <div class="panel-content">
+                            <div class="form-row">
+                                <div class="form-field">
+                                    <label>اسم الشركة</label>
+                                    <input type="text" id="companyName" value="${settings.companyName || ''}" onchange="updateCompanySetting('companyName', this.value)">
+                                </div>
+                                <div class="form-field">
+                                    <label>هاتف الشركة</label>
+                                    <input type="tel" id="companyPhone" value="${settings.companyPhone || ''}" onchange="updateCompanySetting('companyPhone', this.value)">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-field">
+                                    <label>عنوان الشركة</label>
+                                    <input type="text" id="companyAddress" value="${settings.companyAddress || ''}" onchange="updateCompanySetting('companyAddress', this.value)">
+                                </div>
+                                <div class="form-field">
+                                    <label>البريد الإلكتروني</label>
+                                    <input type="email" id="companyEmail" value="${settings.companyEmail || ''}" onchange="updateCompanySetting('companyEmail', this.value)">
+                                </div>
+                            </div>
                         </div>
-                        
-                        <div class="form-group">
-                            <label for="companyPhone">هاتف الشركة</label>
-                            <input type="tel" id="companyPhone" value="${settings.companyPhone || ''}" onchange="updateCompanySetting('companyPhone', this.value)">
+                    </div>
+
+                    <!-- Invoice Settings Panel -->
+                    <div class="settings-panel">
+                        <div class="panel-header">
+                            <div class="panel-icon">
+                                <i class="fas fa-file-invoice"></i>
+                            </div>
+                            <div class="panel-title">
+                                <h3>إعدادات الفواتير</h3>
+                                <p>ترقيم وإعدادات الفواتير</p>
+                            </div>
                         </div>
-                        
-                        <div class="form-group">
-                            <label for="companyEmail">بريد الشركة الإلكتروني</label>
-                            <input type="email" id="companyEmail" value="${settings.companyEmail || ''}" onchange="updateCompanySetting('companyEmail', this.value)">
+                        <div class="panel-content">
+                            <div class="form-row">
+                                <div class="form-field">
+                                    <label>عداد فواتير المبيعات</label>
+                                    <input type="number" id="saleInvoiceCounter" value="${settings.saleInvoiceCounter || 0}" min="0" onchange="updateInvoiceCounter('saleInvoiceCounter', this.value)">
+                                    <small>التالية: ABUSLEAN-SALE-${String((settings.saleInvoiceCounter || 0) + 1).padStart(2, '0')}</small>
+                                </div>
+                                <div class="form-field">
+                                    <label>عداد فواتير المشتريات</label>
+                                    <input type="number" id="purchaseInvoiceCounter" value="${settings.purchaseInvoiceCounter || 0}" min="0" onchange="updateInvoiceCounter('purchaseInvoiceCounter', this.value)">
+                                    <small>التالية: ABUSLEAN-PUR-${String((settings.purchaseInvoiceCounter || 0) + 1).padStart(2, '0')}</small>
+                                </div>
+                            </div>
+                            <div class="panel-actions">
+                                <button class="btn btn-warning" onclick="resetInvoiceNumbers()">
+                                    <i class="fas fa-redo"></i>
+                                    إعادة ترقيم الفواتير
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Settings Panel -->
+                    <div class="settings-panel">
+                        <div class="panel-header">
+                            <div class="panel-icon">
+                                <i class="fas fa-sliders-h"></i>
+                            </div>
+                            <div class="panel-title">
+                                <h3>إعدادات النظام</h3>
+                                <p>التفضيلات العامة</p>
+                            </div>
+                        </div>
+                        <div class="panel-content">
+                            <div class="form-row">
+                                <div class="form-field">
+                                    <label>العملة</label>
+                                    <input type="text" id="systemCurrency" value="${settings.currency || 'د.ك'}" onchange="updateCompanySetting('currency', this.value)">
+                                </div>
+                                <div class="form-field">
+                                    <label>معدل الضريبة (%)</label>
+                                    <input type="number" id="systemTaxRate" value="${settings.taxRate || 0}" step="0.01" min="0" max="100" onchange="updateCompanySetting('taxRate', this.value)">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-field">
+                                    <label>المظهر</label>
+                                    <select id="systemTheme" onchange="changeTheme(this.value)">
+                                        <option value="light" ${settings.theme === 'light' ? 'selected' : ''}>مضيء</option>
+                                        <option value="dark" ${settings.theme === 'dark' ? 'selected' : ''}>داكن</option>
+                                    </select>
+                                </div>
+                                <div class="form-field">
+                                    <label>الفئة الافتراضية</label>
+                                    <select id="defaultCategory" onchange="updateCompanySetting('defaultCategory', this.value)">
+                                        <!-- سيتم تحميل الفئات هنا -->
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            
-            <!-- إعدادات الفواتير -->
-            <div class="settings-card">
-                <div class="settings-card-header">
-                    <h3><i class="fas fa-file-invoice"></i> إعدادات الفواتير</h3>
-                </div>
-                <div class="settings-card-body">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="saleInvoiceCounter">عداد فواتير المبيعات</label>
-                            <input type="number" id="saleInvoiceCounter" value="${settings.saleInvoiceCounter || 0}" min="0" onchange="updateInvoiceCounter('saleInvoiceCounter', this.value)">
-                            <small class="form-help">الفاتورة التالية ستكون: ABUSLEAN-SALE-${String((settings.saleInvoiceCounter || 0) + 1).padStart(2, '0')}</small>
+
+            <!-- Security Tab -->
+            <div class="settings-tab-content" id="securitySettings">
+                <div class="settings-horizontal-layout">
+                    <div class="settings-panel wide-panel">
+                        <div class="panel-header">
+                            <div class="panel-icon security-icon">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <div class="panel-title">
+                                <h3>إعدادات الأمان</h3>
+                                <p>تغيير كلمة مرور المدير</p>
+                            </div>
                         </div>
-                        
-                        <div class="form-group">
-                            <label for="purchaseInvoiceCounter">عداد فواتير المشتريات</label>
-                            <input type="number" id="purchaseInvoiceCounter" value="${settings.purchaseInvoiceCounter || 0}" min="0" onchange="updateInvoiceCounter('purchaseInvoiceCounter', this.value)">
-                            <small class="form-help">الفاتورة التالية ستكون: ABUSLEAN-PUR-${String((settings.purchaseInvoiceCounter || 0) + 1).padStart(2, '0')}</small>
+                        <div class="panel-content">
+                            <div class="security-form">
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label>كلمة المرور الحالية</label>
+                                        <div class="password-input-wrapper">
+                                            <input type="password" id="currentPassword" placeholder="أدخل كلمة المرور الحالية">
+                                            <button type="button" class="password-toggle" onclick="togglePasswordVisibility('currentPassword')">
+                                                <i class="fas fa-eye" id="currentPasswordToggle"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label>كلمة المرور الجديدة</label>
+                                        <div class="password-input-wrapper">
+                                            <input type="password" id="newPassword" placeholder="أدخل كلمة المرور الجديدة">
+                                            <button type="button" class="password-toggle" onclick="togglePasswordVisibility('newPassword')">
+                                                <i class="fas fa-eye" id="newPasswordToggle"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>تأكيد كلمة المرور الجديدة</label>
+                                        <div class="password-input-wrapper">
+                                            <input type="password" id="confirmPassword" placeholder="أعد إدخال كلمة المرور الجديدة">
+                                            <button type="button" class="password-toggle" onclick="togglePasswordVisibility('confirmPassword')">
+                                                <i class="fas fa-eye" id="confirmPasswordToggle"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="panel-actions">
+                                    <button class="btn btn-primary security-btn" onclick="changeAdminPassword()">
+                                        <i class="fas fa-key"></i>
+                                        تغيير كلمة المرور
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="settings-actions">
-                        <button class="btn btn-warning" onclick="resetInvoiceNumbers()">
-                            <i class="fas fa-redo"></i>
-                            إعادة ترقيم الفواتير
-                        </button>
                     </div>
                 </div>
             </div>
-            
-            <!-- النسخ الاحتياطي والتصدير -->
-            <div class="settings-card">
-                <div class="settings-card-header">
-                    <h3><i class="fas fa-database"></i> النسخ الاحتياطي والتصدير</h3>
-                </div>
-                <div class="settings-card-body">
-                    <div class="backup-section">
-                        <h4>تصدير البيانات</h4>
-                        <p>تصدير جميع بيانات النظام إلى ملف JSON</p>
-                        <button class="btn btn-primary" onclick="exportAllData()">
-                            <i class="fas fa-download"></i>
-                            تصدير البيانات
-                        </button>
+
+            <!-- Data Management Tab -->
+            <div class="settings-tab-content" id="dataSettings">
+                <div class="settings-horizontal-layout">
+                    <div class="settings-panel">
+                        <div class="panel-header">
+                            <div class="panel-icon export-icon">
+                                <i class="fas fa-download"></i>
+                            </div>
+                            <div class="panel-title">
+                                <h3>تصدير البيانات</h3>
+                                <p>نسخ احتياطي للبيانات</p>
+                            </div>
+                        </div>
+                        <div class="panel-content">
+                            <p>تصدير جميع بيانات النظام إلى ملف JSON</p>
+                            <div class="panel-actions">
+                                <button class="btn btn-primary" onclick="exportAllData()">
+                                    <i class="fas fa-download"></i>
+                                    تصدير البيانات
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    
-                    <div class="backup-section">
-                        <h4>استيراد البيانات</h4>
-                        <p>استيراد البيانات من ملف JSON</p>
-                        <div class="file-input-container">
-                            <input type="file" id="importDataFile" accept=".json" class="file-input" onchange="importData(this)">
-                            <label for="importDataFile" class="btn btn-secondary">
+
+                    <div class="settings-panel">
+                        <div class="panel-header">
+                            <div class="panel-icon import-icon">
                                 <i class="fas fa-upload"></i>
-                                اختر ملف JSON
-                            </label>
+                            </div>
+                            <div class="panel-title">
+                                <h3>استيراد البيانات</h3>
+                                <p>استعادة من نسخة احتياطية</p>
+                            </div>
+                        </div>
+                        <div class="panel-content">
+                            <p>استيراد البيانات من ملف JSON</p>
+                            <div class="file-upload-area">
+                                <input type="file" id="importDataFile" accept=".json" class="file-input" onchange="importData(this)">
+                                <label for="importDataFile" class="file-upload-label">
+                                    <i class="fas fa-upload"></i>
+                                    <span>اختر ملف JSON</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
-                    
-                    <div class="backup-section">
-                        <h4>إعادة تعيين النظام</h4>
-                        <p class="text-danger">تحذير: سيتم حذف جميع البيانات نهائياً</p>
-                        <button class="btn btn-danger" onclick="resetSystem()">
-                            <i class="fas fa-trash-alt"></i>
-                            مسح جميع البيانات
-                        </button>
+
+                    <div class="settings-panel danger-panel">
+                        <div class="panel-header">
+                            <div class="panel-icon danger-icon">
+                                <i class="fas fa-trash-alt"></i>
+                            </div>
+                            <div class="panel-title">
+                                <h3>إعادة تعيين النظام</h3>
+                                <p class="danger-text">حذف جميع البيانات نهائياً</p>
+                            </div>
+                        </div>
+                        <div class="panel-content">
+                            <p class="warning-text">تحذير: سيتم حذف جميع البيانات نهائياً ولا يمكن التراجع عن هذا الإجراء</p>
+                            <div class="panel-actions">
+                                <button class="btn btn-danger" onclick="resetSystem()">
+                                    <i class="fas fa-trash-alt"></i>
+                                    مسح جميع البيانات
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Information Panel -->
+                <div class="system-info-panel">
+                    <div class="panel-header">
+                        <div class="panel-icon info-icon">
+                            <i class="fas fa-info-circle"></i>
+                        </div>
+                        <div class="panel-title">
+                            <h3>معلومات النظام</h3>
+                            <p>إحصائيات وبيانات النظام</p>
+                        </div>
+                    </div>
+                    <div class="system-stats">
+                        <div class="stat-item">
+                            <div class="stat-icon"><i class="fas fa-code-branch"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-label">إصدار النظام</div>
+                                <div class="stat-value">${settings.version || '1.0'}</div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-icon"><i class="fas fa-clock"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-label">آخر نسخة احتياطية</div>
+                                <div class="stat-value">${getLastBackupDate()}</div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-icon"><i class="fas fa-box"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-label">عدد المنتجات</div>
+                                <div class="stat-value">${db.getTable('products').length}</div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-icon"><i class="fas fa-users"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-label">عدد العملاء</div>
+                                <div class="stat-value">${db.getTable('customers').length}</div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-icon"><i class="fas fa-truck"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-label">عدد الموردين</div>
+                                <div class="stat-value">${db.getTable('suppliers').length}</div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-icon"><i class="fas fa-receipt"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-label">فواتير المبيعات</div>
+                                <div class="stat-value">${db.getTable('sales').length}</div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-icon"><i class="fas fa-shopping-bag"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-label">فواتير المشتريات</div>
+                                <div class="stat-value">${db.getTable('purchases').length}</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-            
-            <!-- إدارة الفئات -->
-            <div class="settings-card">
-                <div class="settings-card-header">
-                    <h3><i class="fas fa-tags"></i> إدارة فئات المنتجات</h3>
-                </div>
-                <div class="settings-card-body">
-                    <div class="category-management">
-                        <div class="category-actions">
+
+            <!-- Categories Tab -->
+            <div class="settings-tab-content" id="categoriesSettings">
+                <div class="categories-dashboard">
+                    <div class="categories-header">
+                        <div class="categories-title">
+                            <div class="panel-icon categories-icon">
+                                <i class="fas fa-tags"></i>
+                            </div>
+                            <div>
+                                <h3>إدارة فئات المنتجات</h3>
+                                <p>إضافة وتعديل فئات المنتجات</p>
+                            </div>
+                        </div>
+                        <div class="categories-actions">
                             <button class="btn btn-primary" onclick="showAddCategoryModal()">
                                 <i class="fas fa-plus"></i>
                                 إضافة فئة جديدة
                             </button>
-                            <button class="btn btn-info" onclick="refreshCategoriesDisplay()">
+                            <button class="btn btn-secondary" onclick="refreshCategoriesDisplay()">
                                 <i class="fas fa-sync"></i>
                                 تحديث القائمة
                             </button>
                         </div>
-
-                        <div class="categories-list" id="categoriesListContainer">
-                            <!-- سيتم تحميل الفئات هنا -->
-                        </div>
+                    </div>
+                    <div class="categories-content" id="categoriesListContainer">
+                        <!-- سيتم تحميل الفئات هنا -->
                     </div>
                 </div>
             </div>
-
-            <!-- إعدادات النظام -->
-            <div class="settings-card">
-                <div class="settings-card-header">
-                    <h3><i class="fas fa-sliders-h"></i> إعدادات النظام</h3>
-                </div>
-                <div class="settings-card-body">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="systemCurrency">العملة</label>
-                            <input type="text" id="systemCurrency" value="${settings.currency || 'د.ك'}" onchange="updateCompanySetting('currency', this.value)">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="systemTaxRate">معدل الضريبة (%)</label>
-                            <input type="number" id="systemTaxRate" value="${settings.taxRate || 0}" step="0.01" min="0" max="100" onchange="updateCompanySetting('taxRate', this.value)">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="systemTheme">المظهر</label>
-                            <select id="systemTheme" onchange="changeTheme(this.value)">
-                                <option value="light" ${settings.theme === 'light' ? 'selected' : ''}>مضيء</option>
-                                <option value="dark" ${settings.theme === 'dark' ? 'selected' : ''}>داكن</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="defaultCategory">الفئة الافتراضية للمنتجات الجديدة</label>
-                            <select id="defaultCategory" onchange="updateCompanySetting('defaultCategory', this.value)">
-                                <!-- سيتم تحميل الفئات هنا -->
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- معلومات النظام -->
-            <div class="settings-card">
-                <div class="settings-card-header">
-                    <h3><i class="fas fa-info-circle"></i> معلومات النظام</h3>
-                </div>
-                <div class="settings-card-body">
-                    <div class="system-info">
-                        <div class="info-item">
-                            <span class="info-label">إصدار النظام:</span>
-                            <span class="info-value">${settings.version || '1.0'}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">تاريخ آخر نسخة احتياطية:</span>
-                            <span class="info-value">${getLastBackupDate()}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">عدد المنتجات:</span>
-                            <span class="info-value">${db.getTable('products').length}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">عدد العملاء:</span>
-                            <span class="info-value">${db.getTable('customers').length}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">عدد الموردين:</span>
-                            <span class="info-value">${db.getTable('suppliers').length}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">عدد فواتير المبيعات:</span>
-                            <span class="info-value">${db.getTable('sales').length}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">عدد فواتير المشتريات:</span>
-                            <span class="info-value">${db.getTable('purchases').length}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        </div>
         </div>
 
         <!-- نافذة إضافة/تعديل الفئة -->
@@ -1149,3 +1309,106 @@ function testCategoryDropdownInSettings() {
 
 window.testCategoryDropdownInSettings = testCategoryDropdownInSettings;
 window.testCategoryManagementInSettings = testCategoryManagementInSettings;
+
+// وظيفة تغيير كلمة مرور المدير
+function changeAdminPassword() {
+    try {
+        const currentPassword = document.getElementById('currentPassword').value;
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        
+        // التحقق من الحقول الفارغة
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            showNotification('يرجى ملء جميع الحقول المطلوبة', 'warning');
+            return;
+        }
+        
+        // التحقق من كلمة المرور الحالية
+        const settings = db.getTable('settings');
+        if (currentPassword !== settings.adminPassword) {
+            showNotification('كلمة المرور الحالية غير صحيحة', 'error');
+            return;
+        }
+        
+        // التحقق من تطابق كلمة المرور الجديدة
+        if (newPassword !== confirmPassword) {
+            showNotification('كلمة المرور الجديدة غير متطابقة', 'error');
+            return;
+        }
+        
+        // التحقق من قوة كلمة المرور
+        if (newPassword.length < 4) {
+            showNotification('كلمة المرور يجب أن تكون 4 أحرف على الأقل', 'warning');
+            return;
+        }
+        
+        // حفظ كلمة المرور الجديدة
+        settings.adminPassword = newPassword;
+        db.setTable('settings', settings);
+        
+        // مسح الحقول
+        document.getElementById('currentPassword').value = '';
+        document.getElementById('newPassword').value = '';
+        document.getElementById('confirmPassword').value = '';
+        
+        showNotification('تم تغيير كلمة المرور بنجاح', 'success');
+        
+    } catch (error) {
+        console.error('خطأ في تغيير كلمة المرور:', error);
+        showNotification('خطأ في تغيير كلمة المرور', 'error');
+    }
+}
+
+// وظيفة إظهار/إخفاء كلمة المرور
+function togglePasswordVisibility(fieldId) {
+    try {
+        const passwordField = document.getElementById(fieldId);
+        const toggleIcon = document.getElementById(fieldId + 'Toggle') || document.getElementById(fieldId + 'ToggleIcon');
+        
+        if (passwordField && toggleIcon) {
+            if (passwordField.type === 'password') {
+                passwordField.type = 'text';
+                toggleIcon.className = 'fas fa-eye-slash';
+            } else {
+                passwordField.type = 'password';
+                toggleIcon.className = 'fas fa-eye';
+            }
+        }
+    } catch (error) {
+        console.error('خطأ في تبديل عرض كلمة المرور:', error);
+    }
+}
+
+// وظيفة تبديل التبويبات
+function switchSettingsTab(tabName) {
+    // إخفاء جميع التبويبات
+    const tabContents = document.querySelectorAll('.settings-tab-content');
+    tabContents.forEach(tab => tab.classList.remove('active'));
+    
+    // إلغاء تنشيط جميع أزرار التبويبات
+    const tabButtons = document.querySelectorAll('.settings-nav-btn');
+    tabButtons.forEach(btn => btn.classList.remove('active'));
+    
+    // تنشيط التبويب المحدد
+    const targetTab = document.getElementById(tabName + 'Settings');
+    if (targetTab) {
+        targetTab.classList.add('active');
+    }
+    
+    // تنشيط الزر المحدد
+    const targetButton = document.querySelector(`[data-tab="${tabName}"]`);
+    if (targetButton) {
+        targetButton.classList.add('active');
+    }
+    
+    // تحميل البيانات الخاصة بالتبويب
+    if (tabName === 'categories') {
+        setTimeout(() => {
+            refreshCategoriesDisplay();
+        }, 100);
+    }
+}
+
+window.changeAdminPassword = changeAdminPassword;
+window.togglePasswordVisibility = togglePasswordVisibility;
+window.switchSettingsTab = switchSettingsTab;

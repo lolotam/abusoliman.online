@@ -329,7 +329,7 @@ function generateSalesReport() {
                 const filteredItems = sale.items.filter(item => item.productId === productFilter);
                 filteredItems.forEach(item => {
                     reportData.push({
-                        invoiceNumber: sale.invoiceNumber,
+                        invoiceNumber: sale.invoiceNumber || 'غير محدد',
                         date: formatDate(sale.invoiceDate || sale.createdAt),
                         product: item.name,
                         customer: customerName,
@@ -344,7 +344,7 @@ function generateSalesReport() {
                 // اعرض جميع المنتجات
                 sale.items.forEach(item => {
                     reportData.push({
-                        invoiceNumber: sale.invoiceNumber,
+                        invoiceNumber: sale.invoiceNumber || 'غير محدد',
                         date: formatDate(sale.invoiceDate || sale.createdAt),
                         product: item.name,
                         customer: customerName,

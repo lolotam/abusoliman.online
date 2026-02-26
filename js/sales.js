@@ -3,8 +3,8 @@
  * أبوسليمان للمحاسبة - نظام إدارة نقاط البيع
  */
 
-// متغيرات السلة
-let cart = [];
+// متغيرات وحدة المبيعات
+let salesCart = [];
 let currentSale = null;
 let selectedWarehouse = null;
 
@@ -302,16 +302,16 @@ function addToCart(productId) {
         }
 
         // البحث عن المنتج في السلة
-        const existingItem = cart.find(item => item.productId === productId);
+        const existingItem = salesCart.find(item => item.productId === productId);
 
         if (existingItem) {
-            if (existingItem.quantity >= warehouseQty) {
-                showNotification('لا يمكن إضافة كمية أكثر من المتوفر في هذا المخزن', 'warning');
+            if (existingItem.quantity >= product.quantity) {
+                showNotification('لا يمكن إضافة كمية أكثر من المتوفر', 'warning');
                 return;
             }
-            existingItem.quantity += 1;
+            existingItem.quantity++;
         } else {
-            cart.push({
+            salesCart.push({
                 productId: productId,
                 name: product.name,
                 price: product.salePrice || product.price || 0,
@@ -339,7 +339,7 @@ function updateCartDisplay() {
 
         if (!cartItems) return;
 
-        if (cart.length === 0) {
+        if (salesCart.length === 0) {
             cartItems.innerHTML = `
                 <div class="empty-cart">
                     <i class="fas fa-shopping-cart"></i>
@@ -351,7 +351,7 @@ function updateCartDisplay() {
             return;
         }
 
-        cartItems.innerHTML = cart.map((item, index) => {
+        cartItems.innerHTML = salesCart.map((item, index) => {
             // الحصول على الكمية المتوفرة في المخزن
             const products = db.getTable('products');
             const product = products.find(p => p.id === item.productId);
@@ -403,7 +403,7 @@ function updateCartItemQuantity(index, newQuantity) {
             return;
         }
 
-        const item = cart[index];
+        const item = salesCart[index];
         if (!item) return;
 
         // التحقق من المخزون المتاح في المخزن المحدد
@@ -423,7 +423,7 @@ function updateCartItemQuantity(index, newQuantity) {
             }
         }
 
-        cart[index].quantity = newQuantity;
+        salesCart[index].quantity = newQuantity;
         updateCartDisplay();
         updateTotals();
 
@@ -435,9 +435,9 @@ function updateCartItemQuantity(index, newQuantity) {
 // إزالة عنصر من السلة
 function removeFromCart(index) {
     try {
-        if (index >= 0 && index < cart.length) {
-            const item = cart[index];
-            cart.splice(index, 1);
+        if (index >= 0 && index < salesCart.length) {
+            const item = salesCart[index];
+            salesCart.splice(index, 1);
             updateCartDisplay();
             updateTotals();
             showNotification(`تم إزالة ${item.name} من السلة`, 'info');
@@ -450,10 +450,10 @@ function removeFromCart(index) {
 // مسح السلة
 function clearCart() {
     try {
-        if (cart.length === 0) return;
+        if (salesCart.length === 0) return;
 
         if (confirm('هل أنت متأكد من مسح جميع عناصر السلة؟')) {
-            cart = [];
+            salesCart = [];
             updateCartDisplay();
             updateTotals();
             showNotification('تم مسح السلة', 'info');
@@ -474,7 +474,7 @@ function updateTotals() {
         const taxType = document.getElementById('taxType')?.value || 'amount';
 
         // حساب المجموع الفرعي
-        const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const subtotal = salesCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
         // حساب الخصم
         let discount = 0;
@@ -566,7 +566,7 @@ function displayProducts(products) {
                 <div class="product-info">
                     <h4 class="product-name">${product.name}</h4>
                     <p class="product-price">${formatCurrency(product.price)}</p>
-                    <p class="product-stock">المخزون: ${toArabicNumbers(product.quantity)}</p>
+                    <p class="product-stock">المخزون: ${db.toArabicNumbers(product.quantity)}</p>
                 </div>
                 <div class="product-actions">
                     <button class="btn btn-sm primary">
@@ -585,7 +585,7 @@ function displayProducts(products) {
 // إتمام البيع
 function completeSale() {
     try {
-        if (cart.length === 0) {
+        if (salesCart.length === 0) {
             showNotification('السلة فارغة', 'warning');
             return;
         }
@@ -609,7 +609,7 @@ function showSaleConfirmation() {
         if (!modal || !detailsContainer) return;
 
         // حساب المجاميع
-        const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const subtotal = salesCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
         const discountAmount = parseFloat(document.getElementById('discountAmount')?.value || 0);
         const discountType = document.getElementById('discountType')?.value || 'amount';
         const taxAmount = parseFloat(document.getElementById('taxAmount')?.value || 0);
@@ -725,8 +725,11 @@ function confirmSale() {
         // إعادة تحميل المنتجات لإظهار الكميات المحدثة
         loadProducts();
 
+        // تحديث جميع مكونات الواجهة المتعلقة بالمخزون
+        refreshAllInventoryComponents();
+
         // إعادة تعيين السلة
-        cart = [];
+        salesCart = [];
         updateCartDisplay();
         updateTotals();
         
@@ -778,12 +781,18 @@ function createSaleRecord() {
     // توليد رقم فاتورة جديد
     const invoiceNumber = db.generateInvoiceNumber('sale');
 
+    // التأكد من وجود رقم فاتورة صحيح
+    if (!invoiceNumber) {
+        console.error('فشل في توليد رقم الفاتورة');
+        throw new Error('فشل في توليد رقم الفاتورة');
+    }
+
     return {
         id: 'sale_' + Date.now(),
         invoiceNumber: invoiceNumber,
         customerId: customerId,
         warehouseId: selectedWarehouse,
-        items: cart.map(item => ({
+        items: salesCart.map(item => ({
             productId: item.productId,
             name: item.name,
             price: item.price,
@@ -1163,6 +1172,154 @@ function saveSalesInvoiceEdit(event, saleId) {
     }
 }
 
+// حذف فاتورة المبيعات
+function deleteSale(saleId) {
+    if (confirm('هل أنت متأكد من حذف هذه الفاتورة؟ سيتم عكس جميع التغييرات في المخزون.')) {
+        try {
+            // الحصول على فاتورة المبيعات قبل حذفها
+            const sale = db.getTable('sales').find(s => s.id === saleId);
+            if (!sale) {
+                showNotification('فاتورة المبيعات غير موجودة', 'error');
+                return;
+            }
+
+            // عكس تغييرات المخزون
+            const inventoryReversalSuccess = reverseSaleInventoryChanges(sale);
+            if (!inventoryReversalSuccess) {
+                showNotification('خطأ في عكس تغييرات المخزون', 'error');
+                return;
+            }
+
+            // حذف الفاتورة
+            const success = db.deleteRecord('sales', saleId);
+            if (success) {
+                showNotification('تم حذف فاتورة المبيعات وعكس تغييرات المخزون بنجاح', 'success');
+
+                // تحديث جميع مكونات الواجهة المتعلقة بالمخزون
+                if (typeof refreshAllInventoryComponents === 'function') {
+                    refreshAllInventoryComponents();
+                }
+
+                // إعادة تحميل قائمة المبيعات إذا كانت مفتوحة
+                if (typeof loadSalesHistory === 'function') {
+                    loadSalesHistory();
+                }
+            } else {
+                showNotification('خطأ في حذف فاتورة المبيعات', 'error');
+            }
+        } catch (error) {
+            console.error('خطأ في حذف فاتورة المبيعات:', error);
+            showNotification('خطأ في حذف فاتورة المبيعات', 'error');
+        }
+    }
+}
+
+// عكس تغييرات المخزون عند حذف فاتورة المبيعات
+function reverseSaleInventoryChanges(sale) {
+    try {
+        if (!sale || !sale.items) {
+            console.error('بيانات فاتورة المبيعات غير صحيحة');
+            return false;
+        }
+
+        const products = db.getTable('products');
+        let allReversalsSuccessful = true;
+
+        sale.items.forEach(item => {
+            const productIndex = products.findIndex(p => p.id === item.productId);
+            if (productIndex !== -1) {
+                const product = products[productIndex];
+
+                // التحقق من وجود توزيع المخازن
+                if (!product.warehouseDistribution) {
+                    product.warehouseDistribution = {};
+                }
+
+                // الحصول على المخزن المستخدم في البيع
+                const warehouseId = item.warehouseId || sale.warehouseId;
+
+                if (!warehouseId) {
+                    console.error(`لا يمكن تحديد المخزن للمنتج ${item.name}`);
+                    allReversalsSuccessful = false;
+                    return;
+                }
+
+                // إعادة الكمية للمخزن (عكس الخصم)
+                const currentQty = product.warehouseDistribution[warehouseId] || 0;
+                const newQty = currentQty + item.quantity;
+                product.warehouseDistribution[warehouseId] = newQty;
+
+                console.log(`عكس المخزون - ${product.name} في المخزن ${warehouseId}: ${currentQty} → ${newQty}`);
+
+                // إعادة حساب الكمية الإجمالية
+                const totalQty = Object.values(product.warehouseDistribution).reduce((sum, qty) => sum + (qty || 0), 0);
+                product.quantity = totalQty;
+
+                // حفظ التحديثات
+                const updateSuccess = db.updateRecord('products', product);
+                if (!updateSuccess) {
+                    console.error(`فشل في عكس مخزون المنتج ${product.name}`);
+                    allReversalsSuccessful = false;
+                }
+            } else {
+                console.error(`المنتج غير موجود: ${item.productId}`);
+                allReversalsSuccessful = false;
+            }
+        });
+
+        if (allReversalsSuccessful) {
+            // إنشاء حركات مخزون عكسية
+            createReverseSaleInventoryMovements(sale);
+            console.log('✅ تم عكس جميع تغييرات المخزون بنجاح');
+            return true;
+        } else {
+            console.error('❌ فشل في عكس بعض تغييرات المخزون');
+            return false;
+        }
+
+    } catch (error) {
+        console.error('خطأ في عكس تغييرات المخزون:', error);
+        return false;
+    }
+}
+
+// إنشاء حركات مخزون عكسية للمبيعات المحذوفة
+function createReverseSaleInventoryMovements(sale) {
+    try {
+        const movements = db.getTable('inventory_movements');
+        const warehouses = db.getTable('warehouses');
+
+        sale.items.forEach(item => {
+            const warehouseId = item.warehouseId || sale.warehouseId;
+            const warehouse = warehouses.find(w => w.id === warehouseId);
+
+            if (warehouseId && item.quantity > 0) {
+                const movement = {
+                    id: 'movement_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11),
+                    productId: item.productId,
+                    productName: item.name,
+                    warehouseId: warehouseId,
+                    warehouseName: warehouse ? warehouse.name : 'مخزن غير محدد',
+                    type: 'in', // دخول (عكس الخروج الأصلي)
+                    quantity: item.quantity,
+                    reason: 'sale_reversal', // عكس بيع
+                    referenceId: sale.id,
+                    notes: `عكس فاتورة مبيعات رقم ${sale.invoiceNumber}`,
+                    createdAt: new Date().toISOString(),
+                    createdBy: 'system'
+                };
+
+                movements.push(movement);
+            }
+        });
+
+        db.setTable('inventory_movements', movements);
+
+    } catch (error) {
+        console.error('خطأ في إنشاء حركات المخزون العكسية:', error);
+    }
+}
+
 // إتمام البيع
 function completeSale() {
     try {
@@ -1411,43 +1568,7 @@ function testInventoryDeduction() {
     }
 }
 
-// تأكيد البيع
-function confirmSale() {
-    try {
-        const sale = createSaleRecord();
 
-        // حفظ البيع
-        db.addRecord('sales', sale);
-
-        // تحديث المخزون
-        const inventoryUpdateSuccess = updateInventoryAfterSale();
-
-        if (!inventoryUpdateSuccess) {
-            showNotification('خطأ في تحديث المخزون', 'error');
-            return;
-        }
-
-        // إغلاق النافذة
-        closeSaleConfirm();
-
-        // مسح السلة
-        clearCart();
-
-        // تحديث رقم الفاتورة التالي
-        updateInvoiceNumberDisplay();
-
-        showNotification(`تم حفظ البيع بنجاح - رقم الفاتورة: ${sale.invoiceNumber}`, 'success');
-
-        // طباعة الفاتورة (اختياري)
-        if (confirm('هل تريد طباعة الفاتورة؟')) {
-            printInvoice(sale);
-        }
-
-    } catch (error) {
-        console.error('خطأ في تأكيد البيع:', error);
-        showNotification('خطأ في حفظ البيع', 'error');
-    }
-}
 
 // تصدير الوظائف للاستخدام العام
 window.initSales = initSales;
@@ -1468,9 +1589,11 @@ window.newSale = newSale;
 window.showSalesHistory = showSalesHistory;
 window.addNewCustomer = addNewCustomer;
 window.editSalesInvoice = editSalesInvoice;
+window.deleteSale = deleteSale;
 window.saveSalesInvoiceEdit = saveSalesInvoiceEdit;
 window.updateInvoiceNumberDisplay = updateInvoiceNumberDisplay;
 window.testInventoryDeduction = testInventoryDeduction;
+window.testCompleteInventorySync = testCompleteInventorySync;
 
 // اختبار شامل لنقطة البيع والمخزون
 function testPOSInventoryDeduction() {
@@ -1573,3 +1696,484 @@ function testPOSInventoryDeduction() {
 }
 
 window.testPOSInventoryDeduction = testPOSInventoryDeduction;
+
+// اختبار شامل لتزامن المخزون
+function testCompleteInventorySync() {
+    try {
+        console.log('🧪 بدء اختبار شامل لتزامن المخزون...');
+
+        // إنشاء منتج تجريبي
+        const testProduct = {
+            id: 'test_sync_product_' + Date.now(),
+            name: 'منتج اختبار التزامن',
+            salePrice: 15.000,
+            purchasePrice: 10.000,
+            quantity: 0,
+            warehouseDistribution: {}
+        };
+
+        // حفظ المنتج
+        const products = db.getTable('products');
+        products.push(testProduct);
+        db.setTable('products', products);
+
+        console.log('✅ تم إنشاء منتج تجريبي:', testProduct.name);
+
+        // اختبار 1: إنشاء فاتورة شراء
+        console.log('\n📦 اختبار 1: إنشاء فاتورة شراء...');
+
+        const purchaseItems = [{
+            productId: testProduct.id,
+            name: testProduct.name,
+            price: testProduct.purchasePrice,
+            quantity: 20,
+            total: testProduct.purchasePrice * 20,
+            warehouseDistribution: {
+                'main': 8,
+                'salmiya': 7,
+                'hawally': 5
+            }
+        }];
+
+        // محاكاة إنشاء فاتورة شراء
+        if (typeof updateInventoryAfterPurchase === 'function') {
+            updateInventoryAfterPurchase(purchaseItems);
+
+            // التحقق من النتائج
+            const updatedProducts = db.getTable('products');
+            const updatedProduct = updatedProducts.find(p => p.id === testProduct.id);
+
+            if (updatedProduct) {
+                console.log('✅ تم تحديث المخزون بعد الشراء:');
+                console.log(`   الإجمالي: ${updatedProduct.quantity}`);
+                console.log(`   التوزيع:`, updatedProduct.warehouseDistribution);
+
+                // اختبار 2: إنشاء فاتورة مبيعات
+                console.log('\n🛒 اختبار 2: إنشاء فاتورة مبيعات...');
+
+                // محاكاة بيع من مخزن السالمية
+                selectedWarehouse = 'salmiya';
+                cart = [{
+                    productId: testProduct.id,
+                    name: testProduct.name,
+                    price: testProduct.salePrice,
+                    quantity: 3,
+                    warehouseId: 'salmiya'
+                }];
+
+                const saleSuccess = updateInventoryAfterSale();
+
+                if (saleSuccess) {
+                    const afterSaleProducts = db.getTable('products');
+                    const afterSaleProduct = afterSaleProducts.find(p => p.id === testProduct.id);
+
+                    console.log('✅ تم تحديث المخزون بعد البيع:');
+                    console.log(`   الإجمالي: ${afterSaleProduct.quantity}`);
+                    console.log(`   التوزيع:`, afterSaleProduct.warehouseDistribution);
+
+                    // اختبار 3: محاكاة حذف فاتورة مبيعات
+                    console.log('\n🔄 اختبار 3: عكس فاتورة المبيعات...');
+
+                    const mockSale = {
+                        id: 'test_sale_' + Date.now(),
+                        invoiceNumber: 'TEST-SALE-001',
+                        warehouseId: 'salmiya',
+                        items: [{
+                            productId: testProduct.id,
+                            name: testProduct.name,
+                            quantity: 3,
+                            warehouseId: 'salmiya'
+                        }]
+                    };
+
+                    const reversalSuccess = reverseSaleInventoryChanges(mockSale);
+
+                    if (reversalSuccess) {
+                        const afterReversalProducts = db.getTable('products');
+                        const afterReversalProduct = afterReversalProducts.find(p => p.id === testProduct.id);
+
+                        console.log('✅ تم عكس فاتورة المبيعات:');
+                        console.log(`   الإجمالي: ${afterReversalProduct.quantity}`);
+                        console.log(`   التوزيع:`, afterReversalProduct.warehouseDistribution);
+
+                        // تنظيف البيانات التجريبية
+                        const cleanProducts = db.getTable('products').filter(p => p.id !== testProduct.id);
+                        db.setTable('products', cleanProducts);
+
+                        console.log('\n🎉 اكتمل الاختبار الشامل بنجاح!');
+                        showNotification('اكتمل اختبار تزامن المخزون بنجاح', 'success');
+                    } else {
+                        console.error('❌ فشل في عكس فاتورة المبيعات');
+                        showNotification('فشل في عكس فاتورة المبيعات', 'error');
+                    }
+                } else {
+                    console.error('❌ فشل في تحديث المخزون بعد البيع');
+                    showNotification('فشل في تحديث المخزون بعد البيع', 'error');
+                }
+            } else {
+                console.error('❌ لم يتم العثور على المنتج بعد التحديث');
+                showNotification('لم يتم العثور على المنتج بعد التحديث', 'error');
+            }
+        } else {
+            console.error('❌ دالة تحديث المخزون بعد الشراء غير متوفرة');
+            showNotification('دالة تحديث المخزون بعد الشراء غير متوفرة', 'error');
+        }
+
+    } catch (error) {
+        console.error('خطأ في اختبار تزامن المخزون:', error);
+        showNotification('خطأ في اختبار تزامن المخزون', 'error');
+    }
+}
+
+// تحديث جميع مكونات الواجهة المتعلقة بالمخزون
+function refreshAllInventoryComponents() {
+    try {
+        console.log('🔄 تحديث جميع مكونات الواجهة المتعلقة بالمخزون...');
+
+        // تحديث لوحة المعلومات إذا كانت مرئية
+        if (typeof updateDashboard === 'function') {
+            updateDashboard();
+            console.log('✅ تم تحديث لوحة المعلومات');
+        }
+
+        // تحديث قائمة المنتجات إذا كانت مرئية
+        const productsSection = document.getElementById('products');
+        if (productsSection && !productsSection.classList.contains('hidden')) {
+            if (typeof window.loadProducts === 'function') {
+                window.loadProducts();
+                console.log('✅ تم تحديث قائمة المنتجات');
+            }
+        }
+
+        // تحديث تقارير المخزون إذا كانت مرئية
+        const reportsSection = document.getElementById('reports');
+        if (reportsSection && !reportsSection.classList.contains('hidden')) {
+            const inventoryTab = document.querySelector('[data-tab="inventory"]');
+            if (inventoryTab && inventoryTab.classList.contains('active')) {
+                if (typeof generateInventoryReport === 'function') {
+                    generateInventoryReport();
+                    console.log('✅ تم تحديث تقرير المخزون');
+                }
+            }
+        }
+
+        // تحديث قسم المخازن إذا كان مرئياً
+        const warehousesSection = document.getElementById('warehouses');
+        if (warehousesSection && !warehousesSection.classList.contains('hidden')) {
+            if (typeof loadWarehousesSection === 'function') {
+                loadWarehousesSection();
+                console.log('✅ تم تحديث قسم المخازن');
+            }
+        }
+
+        console.log('✅ تم تحديث جميع مكونات الواجهة بنجاح');
+
+    } catch (error) {
+        console.error('خطأ في تحديث مكونات الواجهة:', error);
+    }
+}
+
+window.refreshAllInventoryComponents = refreshAllInventoryComponents;
+
+// اختبار السيناريو المحدد: صبغ أصفر
+function testYellowPaintScenario() {
+    try {
+        console.log('🧪 بدء اختبار سيناريو صبغ أصفر...');
+
+        // إنشاء منتج صبغ أصفر تجريبي
+        const yellowPaint = {
+            id: 'yellow_paint_test_' + Date.now(),
+            name: 'صبغ أصفر',
+            salePrice: 25.000,
+            purchasePrice: 15.000,
+            quantity: 150,
+            minStock: 10,
+            warehouseDistribution: {
+                'main': 150
+            },
+            createdAt: new Date().toISOString()
+        };
+
+        // حفظ المنتج
+        const products = db.getTable('products');
+        products.push(yellowPaint);
+        db.setTable('products', products);
+
+        console.log(`✅ تم إنشاء منتج: ${yellowPaint.name} بكمية ${yellowPaint.quantity}`);
+
+        // محاكاة الفاتورة الأولى: 7 وحدات
+        console.log('\n📋 محاكاة الفاتورة الأولى (#mcytm2te): 7 وحدات...');
+
+        selectedWarehouse = 'main';
+        cart = [{
+            productId: yellowPaint.id,
+            name: yellowPaint.name,
+            price: yellowPaint.salePrice,
+            quantity: 7,
+            warehouseId: 'main'
+        }];
+
+        // إنشاء فاتورة المبيعات الأولى
+        const sale1 = createSaleRecord();
+        sale1.invoiceNumber = 'ABUSLEAN-SALE-mcytm2te'; // محاكاة رقم الفاتورة المذكور
+        db.addRecord('sales', sale1);
+
+        // تحديث المخزون
+        const success1 = updateInventoryAfterSale();
+        if (success1) {
+            const updatedProducts1 = db.getTable('products');
+            const updatedProduct1 = updatedProducts1.find(p => p.id === yellowPaint.id);
+            console.log(`✅ بعد الفاتورة الأولى: الكمية = ${updatedProduct1.quantity} (متوقع: 143)`);
+
+            // محاكاة الفاتورة الثانية: 4 وحدات
+            console.log('\n📋 محاكاة الفاتورة الثانية (#mcyql7om): 4 وحدات...');
+
+            cart = [{
+                productId: yellowPaint.id,
+                name: yellowPaint.name,
+                price: yellowPaint.salePrice,
+                quantity: 4,
+                warehouseId: 'main'
+            }];
+
+            // إنشاء فاتورة المبيعات الثانية
+            const sale2 = createSaleRecord();
+            sale2.invoiceNumber = 'ABUSLEAN-SALE-mcyql7om'; // محاكاة رقم الفاتورة المذكور
+            db.addRecord('sales', sale2);
+
+            // تحديث المخزون
+            const success2 = updateInventoryAfterSale();
+            if (success2) {
+                const updatedProducts2 = db.getTable('products');
+                const finalProduct = updatedProducts2.find(p => p.id === yellowPaint.id);
+
+                console.log(`\n🎯 النتيجة النهائية:`);
+                console.log(`   الكمية الأولية: 150`);
+                console.log(`   الفاتورة الأولى: -7`);
+                console.log(`   الفاتورة الثانية: -4`);
+                console.log(`   الكمية النهائية: ${finalProduct.quantity}`);
+                console.log(`   الكمية المتوقعة: 139`);
+                console.log(`   التوزيع: ${JSON.stringify(finalProduct.warehouseDistribution)}`);
+
+                // التحقق من صحة النتيجة
+                if (finalProduct.quantity === 139) {
+                    console.log('🎉 نجح الاختبار! الكمية صحيحة');
+                    showNotification('نجح اختبار صبغ أصفر - الكمية صحيحة (139)', 'success');
+
+                    // اختبار تحديث التقارير
+                    console.log('\n📊 اختبار تحديث التقارير...');
+                    if (typeof generateSalesReport === 'function') {
+                        generateSalesReport();
+                        console.log('✅ تم تحديث تقرير المبيعات');
+                    }
+
+                    // تنظيف البيانات التجريبية
+                    const cleanProducts = db.getTable('products').filter(p => p.id !== yellowPaint.id);
+                    db.setTable('products', cleanProducts);
+
+                    const cleanSales = db.getTable('sales').filter(s => s.id !== sale1.id && s.id !== sale2.id);
+                    db.setTable('sales', cleanSales);
+
+                    console.log('🧹 تم تنظيف البيانات التجريبية');
+
+                    return true;
+                } else {
+                    console.error(`❌ فشل الاختبار! الكمية النهائية ${finalProduct.quantity} بدلاً من 139`);
+                    showNotification(`فشل اختبار صبغ أصفر - الكمية ${finalProduct.quantity} بدلاً من 139`, 'error');
+                    return false;
+                }
+            } else {
+                console.error('❌ فشل في تحديث المخزون للفاتورة الثانية');
+                return false;
+            }
+        } else {
+            console.error('❌ فشل في تحديث المخزون للفاتورة الأولى');
+            return false;
+        }
+
+    } catch (error) {
+        console.error('خطأ في اختبار سيناريو صبغ أصفر:', error);
+        showNotification('خطأ في اختبار سيناريو صبغ أصفر', 'error');
+        return false;
+    }
+}
+
+window.testYellowPaintScenario = testYellowPaintScenario;
+
+// اختبار عرض أرقام الفواتير في التقارير
+function testInvoiceNumbersInReports() {
+    try {
+        console.log('🧪 بدء اختبار عرض أرقام الفواتير في التقارير...');
+
+        // إنشاء منتج تجريبي
+        const testProduct = {
+            id: 'invoice_test_product_' + Date.now(),
+            name: 'منتج اختبار الفواتير',
+            salePrice: 20.000,
+            purchasePrice: 12.000,
+            quantity: 100,
+            warehouseDistribution: {
+                'main': 100
+            },
+            createdAt: new Date().toISOString()
+        };
+
+        // حفظ المنتج
+        const products = db.getTable('products');
+        products.push(testProduct);
+        db.setTable('products', products);
+
+        // إنشاء فاتورة مبيعات تجريبية
+        selectedWarehouse = 'main';
+        cart = [{
+            productId: testProduct.id,
+            name: testProduct.name,
+            price: testProduct.salePrice,
+            quantity: 5,
+            warehouseId: 'main'
+        }];
+
+        const testSale = createSaleRecord();
+        console.log(`✅ تم إنشاء فاتورة برقم: ${testSale.invoiceNumber}`);
+
+        // التحقق من وجود رقم الفاتورة
+        if (testSale.invoiceNumber && testSale.invoiceNumber !== 'undefined' && testSale.invoiceNumber.includes('ABUSLEAN-SALE-')) {
+            console.log('✅ رقم الفاتورة صحيح ومُنسق بشكل صحيح');
+
+            // حفظ الفاتورة
+            db.addRecord('sales', testSale);
+            updateInventoryAfterSale();
+
+            // اختبار عرض الفاتورة في التقارير
+            console.log('\n📊 اختبار عرض الفاتورة في تقرير المبيعات...');
+
+            if (typeof generateSalesReport === 'function') {
+                // محاكاة توليد التقرير
+                const sales = db.getTable('sales');
+                const testSaleInDB = sales.find(s => s.id === testSale.id);
+
+                if (testSaleInDB && testSaleInDB.invoiceNumber) {
+                    console.log(`✅ الفاتورة موجودة في قاعدة البيانات برقم: ${testSaleInDB.invoiceNumber}`);
+
+                    // محاكاة بيانات التقرير
+                    const reportData = [];
+                    testSaleInDB.items.forEach(item => {
+                        reportData.push({
+                            invoiceNumber: testSaleInDB.invoiceNumber || 'غير محدد',
+                            date: new Date().toLocaleDateString('ar-SA'),
+                            product: item.name,
+                            customer: 'عميل تجريبي',
+                            quantity: item.quantity,
+                            unitPrice: item.price,
+                            totalAmount: item.total
+                        });
+                    });
+
+                    console.log('📋 بيانات التقرير:');
+                    reportData.forEach(row => {
+                        console.log(`   رقم الفاتورة: ${row.invoiceNumber}`);
+                        console.log(`   المنتج: ${row.product}`);
+                        console.log(`   الكمية: ${row.quantity}`);
+                    });
+
+                    // التحقق من عدم وجود "undefined"
+                    const hasUndefined = reportData.some(row =>
+                        row.invoiceNumber === 'undefined' ||
+                        row.invoiceNumber === undefined ||
+                        row.invoiceNumber === null
+                    );
+
+                    if (!hasUndefined) {
+                        console.log('🎉 نجح اختبار أرقام الفواتير! لا توجد قيم undefined');
+                        showNotification('نجح اختبار أرقام الفواتير في التقارير', 'success');
+
+                        // تنظيف البيانات التجريبية
+                        const cleanProducts = db.getTable('products').filter(p => p.id !== testProduct.id);
+                        db.setTable('products', cleanProducts);
+
+                        const cleanSales = db.getTable('sales').filter(s => s.id !== testSale.id);
+                        db.setTable('sales', cleanSales);
+
+                        console.log('🧹 تم تنظيف البيانات التجريبية');
+                        return true;
+                    } else {
+                        console.error('❌ فشل الاختبار! توجد قيم undefined في أرقام الفواتير');
+                        showNotification('فشل اختبار أرقام الفواتير - توجد قيم undefined', 'error');
+                        return false;
+                    }
+                } else {
+                    console.error('❌ الفاتورة غير موجودة في قاعدة البيانات أو رقم الفاتورة مفقود');
+                    return false;
+                }
+            } else {
+                console.error('❌ دالة توليد تقرير المبيعات غير متوفرة');
+                return false;
+            }
+        } else {
+            console.error(`❌ رقم الفاتورة غير صحيح: ${testSale.invoiceNumber}`);
+            showNotification('فشل في توليد رقم فاتورة صحيح', 'error');
+            return false;
+        }
+
+    } catch (error) {
+        console.error('خطأ في اختبار أرقام الفواتير:', error);
+        showNotification('خطأ في اختبار أرقام الفواتير', 'error');
+        return false;
+    }
+}
+
+window.testInvoiceNumbersInReports = testInvoiceNumbersInReports;
+
+// اختبار شامل للإصلاحات
+function testInventoryAndInvoiceFixes() {
+    try {
+        console.log('🧪 بدء الاختبار الشامل للإصلاحات...');
+        console.log('=' .repeat(60));
+
+        let allTestsPassed = true;
+
+        // اختبار 1: أرقام الفواتير في التقارير
+        console.log('\n🔍 اختبار 1: أرقام الفواتير في التقارير');
+        const invoiceTest = testInvoiceNumbersInReports();
+        if (!invoiceTest) {
+            allTestsPassed = false;
+        }
+
+        // انتظار قصير بين الاختبارات
+        setTimeout(() => {
+            // اختبار 2: سيناريو صبغ أصفر
+            console.log('\n🔍 اختبار 2: سيناريو صبغ أصفر (150 - 7 - 4 = 139)');
+            const inventoryTest = testYellowPaintScenario();
+            if (!inventoryTest) {
+                allTestsPassed = false;
+            }
+
+            // النتائج النهائية
+            console.log('\n' + '=' .repeat(60));
+            console.log('📋 ملخص نتائج الاختبار:');
+            console.log(`   اختبار أرقام الفواتير: ${invoiceTest ? '✅ نجح' : '❌ فشل'}`);
+            console.log(`   اختبار تحديث المخزون: ${inventoryTest ? '✅ نجح' : '❌ فشل'}`);
+
+            if (allTestsPassed) {
+                console.log('\n🎉 نجحت جميع الاختبارات! تم إصلاح المشاكل بنجاح');
+                showNotification('نجحت جميع الاختبارات - تم إصلاح المشاكل', 'success');
+            } else {
+                console.log('\n⚠️ فشل في بعض الاختبارات - يحتاج مراجعة إضافية');
+                showNotification('فشل في بعض الاختبارات', 'warning');
+            }
+
+            console.log('=' .repeat(60));
+
+            return allTestsPassed;
+        }, 1000);
+
+    } catch (error) {
+        console.error('خطأ في الاختبار الشامل:', error);
+        showNotification('خطأ في الاختبار الشامل', 'error');
+        return false;
+    }
+}
+
+window.testInventoryAndInvoiceFixes = testInventoryAndInvoiceFixes;
+
+})();

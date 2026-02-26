@@ -3,14 +3,12 @@
  * أبوسليمان للمحاسبة - نظام إدارة نقاط البيع
  */
 
-// متغيرات المشتريات
-let currentPurchase = null;
-let purchaseItems = [];
-
-// التأكد من عدم تعارض المتغيرات العامة
-if (typeof window !== 'undefined' && !window.purchaseModuleLoaded) {
-    window.purchaseModuleLoaded = true;
-}
+// متغيرات وحدة المشتريات (نطاق محلي للوحدة)
+(function() {
+    'use strict';
+    
+    let currentPurchase = null;
+    let purchaseCart = [];
 
 // تهيئة صفحة المشتريات
 function initPurchases() {
@@ -565,6 +563,11 @@ function savePurchase(event) {
         // تحديث المخزون
         updateInventoryAfterPurchase(items);
 
+        // تحديث جميع مكونات الواجهة المتعلقة بالمخزون
+        if (typeof refreshAllInventoryComponents === 'function') {
+            refreshAllInventoryComponents();
+        }
+
         showNotification('تم حفظ فاتورة الشراء بنجاح', 'success');
         closeModal();
         loadPurchases();
@@ -776,14 +779,169 @@ function viewPurchase(purchaseId) {
 
 // حذف فاتورة الشراء
 function deletePurchase(purchaseId) {
-    if (confirm('هل أنت متأكد من حذف هذه الفاتورة؟')) {
-        const success = db.deleteRecord('purchases', purchaseId);
-        if (success) {
-            showNotification('تم حذف فاتورة الشراء بنجاح', 'success');
-            loadPurchases();
-        } else {
+    if (confirm('هل أنت متأكد من حذف هذه الفاتورة؟ سيتم عكس جميع التغييرات في المخزون.')) {
+        try {
+            // الحصول على فاتورة الشراء قبل حذفها
+            const purchase = db.getTable('purchases').find(p => p.id === purchaseId);
+            if (!purchase) {
+                showNotification('فاتورة الشراء غير موجودة', 'error');
+                return;
+            }
+
+            // عكس تغييرات المخزون
+            const inventoryReversalSuccess = reversePurchaseInventoryChanges(purchase);
+            if (!inventoryReversalSuccess) {
+                showNotification('خطأ في عكس تغييرات المخزون', 'error');
+                return;
+            }
+
+            // حذف الفاتورة
+            const success = db.deleteRecord('purchases', purchaseId);
+            if (success) {
+                showNotification('تم حذف فاتورة الشراء وعكس تغييرات المخزون بنجاح', 'success');
+
+                // تحديث جميع مكونات الواجهة المتعلقة بالمخزون
+                if (typeof refreshAllInventoryComponents === 'function') {
+                    refreshAllInventoryComponents();
+                }
+
+                loadPurchases();
+            } else {
+                showNotification('خطأ في حذف فاتورة الشراء', 'error');
+            }
+        } catch (error) {
+            console.error('خطأ في حذف فاتورة الشراء:', error);
             showNotification('خطأ في حذف فاتورة الشراء', 'error');
         }
+    }
+}
+
+// عكس تغييرات المخزون عند حذف فاتورة الشراء
+function reversePurchaseInventoryChanges(purchase) {
+    try {
+        if (!purchase || !purchase.items) {
+            console.error('بيانات فاتورة الشراء غير صحيحة');
+            return false;
+        }
+
+        const products = db.getTable('products');
+        let allReversalsSuccessful = true;
+
+        purchase.items.forEach((item, itemIndex) => {
+            const productIndex = products.findIndex(p => p.id === item.productId);
+            if (productIndex !== -1) {
+                const product = products[productIndex];
+
+                // التحقق من وجود توزيع المخازن
+                if (!product.warehouseDistribution) {
+                    product.warehouseDistribution = {};
+                }
+
+                // الحصول على توزيع المخازن للصنف من الفاتورة
+                const warehouseDistribution = item.warehouseDistribution || {};
+
+                // إذا لم يكن هناك توزيع محدد، استخدم المخزن الرئيسي
+                if (Object.keys(warehouseDistribution).length === 0) {
+                    const warehouses = db.getTable('warehouses').filter(w => w.isActive);
+                    const mainWarehouse = warehouses.find(w => w.id === 'main') || warehouses[0];
+
+                    if (mainWarehouse) {
+                        warehouseDistribution[mainWarehouse.id] = item.quantity;
+                    }
+                }
+
+                // عكس التوزيع - خصم الكميات من كل مخزن
+                Object.keys(warehouseDistribution).forEach(warehouseId => {
+                    const qty = warehouseDistribution[warehouseId];
+                    if (qty > 0) {
+                        const currentQty = product.warehouseDistribution[warehouseId] || 0;
+                        const newQty = Math.max(0, currentQty - qty);
+                        product.warehouseDistribution[warehouseId] = newQty;
+
+                        console.log(`عكس المخزون - ${product.name} في المخزن ${warehouseId}: ${currentQty} → ${newQty}`);
+                    }
+                });
+
+                // إعادة حساب الكمية الإجمالية
+                const totalQty = Object.values(product.warehouseDistribution).reduce((sum, qty) => sum + (qty || 0), 0);
+                product.quantity = totalQty;
+
+                // حفظ التحديثات
+                const updateSuccess = db.updateRecord('products', product);
+                if (!updateSuccess) {
+                    console.error(`فشل في عكس مخزون المنتج ${product.name}`);
+                    allReversalsSuccessful = false;
+                }
+            } else {
+                console.error(`المنتج غير موجود: ${item.productId}`);
+                allReversalsSuccessful = false;
+            }
+        });
+
+        if (allReversalsSuccessful) {
+            // إنشاء حركات مخزون عكسية
+            createReversePurchaseInventoryMovements(purchase);
+            console.log('✅ تم عكس جميع تغييرات المخزون بنجاح');
+            return true;
+        } else {
+            console.error('❌ فشل في عكس بعض تغييرات المخزون');
+            return false;
+        }
+
+    } catch (error) {
+        console.error('خطأ في عكس تغييرات المخزون:', error);
+        return false;
+    }
+}
+
+// إنشاء حركات مخزون عكسية للمشتريات المحذوفة
+function createReversePurchaseInventoryMovements(purchase) {
+    try {
+        const movements = db.getTable('inventory_movements');
+        const warehouses = db.getTable('warehouses');
+
+        purchase.items.forEach((item, itemIndex) => {
+            const warehouseDistribution = item.warehouseDistribution || {};
+
+            // إذا لم يكن هناك توزيع محدد، استخدم المخزن الرئيسي
+            if (Object.keys(warehouseDistribution).length === 0) {
+                const activeWarehouses = warehouses.filter(w => w.isActive);
+                const mainWarehouse = activeWarehouses.find(w => w.id === 'main') || activeWarehouses[0];
+
+                if (mainWarehouse) {
+                    warehouseDistribution[mainWarehouse.id] = item.quantity;
+                }
+            }
+
+            Object.keys(warehouseDistribution).forEach(warehouseId => {
+                const qty = warehouseDistribution[warehouseId];
+                const warehouse = warehouses.find(w => w.id === warehouseId);
+
+                if (qty > 0) {
+                    const movement = {
+                        id: 'movement_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11),
+                        productId: item.productId,
+                        productName: item.name,
+                        warehouseId: warehouseId,
+                        warehouseName: warehouse ? warehouse.name : 'مخزن غير محدد',
+                        type: 'out', // خروج (عكس الدخول الأصلي)
+                        quantity: qty,
+                        reason: 'purchase_reversal', // عكس شراء
+                        referenceId: purchase.id,
+                        notes: `عكس فاتورة شراء رقم ${purchase.invoiceNumber}`,
+                        createdAt: new Date().toISOString(),
+                        createdBy: 'system'
+                    };
+
+                    movements.push(movement);
+                }
+            });
+        });
+
+        db.setTable('inventory_movements', movements);
+
+    } catch (error) {
+        console.error('خطأ في إنشاء حركات المخزون العكسية:', error);
     }
 }
 
@@ -1064,3 +1222,5 @@ window.validateDistribution = validateDistribution;
 window.autoDistributeToMainWarehouse = autoDistributeToMainWarehouse;
 window.editPurchase = editPurchase;
 window.savePurchaseInvoiceEdit = savePurchaseInvoiceEdit;
+
+})();

@@ -264,6 +264,16 @@ function showSection(sectionName) {
         link.classList.remove('active');
     });
 
+    // إدارة فئة settings-active للمحتوى الرئيسي
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent) {
+        if (sectionName === 'settings') {
+            mainContent.classList.add('settings-active');
+        } else {
+            mainContent.classList.remove('settings-active');
+        }
+    }
+
     // عرض القسم المطلوب
     const targetSection = document.getElementById(sectionName);
     if (targetSection) {
@@ -909,6 +919,72 @@ function runComprehensiveSystemTest() {
 window.showSection = showSection;
 window.showNotification = showNotification;
 window.formatCurrency = formatCurrency;
-window.toArabicNumbers = toArabicNumbers;
+window.formatNumber = formatNumber;
 window.initializeApp = initializeApp;
 window.runComprehensiveSystemTest = runComprehensiveSystemTest;
+window.testAllFixes = function() {
+    if (typeof runComprehensiveFixValidation === 'function') {
+        return runComprehensiveFixValidation();
+    } else {
+        console.error('دالة اختبار الإصلاحات غير متاحة');
+        return false;
+    }
+};
+
+// إصلاح موضع القائمة المنسدلة للمستخدم
+function adjustDropdownPosition() {
+    const dropdownMenus = document.querySelectorAll('.dropdown-menu');
+    dropdownMenus.forEach(dropdown => {
+        if (!dropdown.offsetParent) return; // تجاهل القوائم المخفية
+        
+        const rect = dropdown.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const parentRect = dropdown.offsetParent.getBoundingClientRect();
+        
+        // إعادة تعيين القيم الافتراضية
+        dropdown.style.right = '';
+        dropdown.style.left = '';
+        dropdown.style.transform = '';
+        
+        // إذا كانت القائمة تتجاوز حدود الشاشة من اليمين
+        if (rect.right > viewportWidth - 10) {
+            const overflow = rect.right - viewportWidth + 20;
+            dropdown.style.right = overflow + 'px';
+        }
+        
+        // إذا كانت القائمة تتجاوز حدود الشاشة من اليسار
+        if (rect.left < 10) {
+            dropdown.style.left = '10px';
+            dropdown.style.right = 'auto';
+        }
+    });
+}
+
+// تطبيق الإصلاح عند تحميل الصفحة وتغيير حجم الشاشة
+window.addEventListener('load', function() {
+    setTimeout(adjustDropdownPosition, 100);
+});
+
+window.addEventListener('resize', function() {
+    setTimeout(adjustDropdownPosition, 100);
+});
+
+// تطبيق الإصلاح عند إظهار القائمة المنسدلة
+document.addEventListener('mouseenter', function(e) {
+    if (e.target.closest('.user-menu')) {
+        setTimeout(adjustDropdownPosition, 100);
+    }
+});
+
+// إضافة event listener للحصول على موضع دقيق عند hover
+document.addEventListener('DOMContentLoaded', function() {
+    const userMenus = document.querySelectorAll('.user-menu');
+    userMenus.forEach(menu => {
+        menu.addEventListener('mouseenter', function() {
+            setTimeout(adjustDropdownPosition, 150);
+        });
+    });
+});
+
+// تصدير الوظيفة
+window.adjustDropdownPosition = adjustDropdownPosition;

@@ -24,6 +24,7 @@ class Database {
                 taxRate: 0, // الكويت لا تطبق ضريبة القيمة المضافة حالياً
                 currency: 'د.ك',
                 password: this.hashPassword('123'),
+                adminPassword: '@Xx123456789xX@', // كلمة مرور المدير الافتراضية
                 theme: 'light',
                 logo: '',
                 initialized: true,
@@ -91,6 +92,7 @@ class Database {
                 taxRate: 0,
                 currency: 'د.ك',
                 password: this.hashPassword('123'),
+                adminPassword: '@Xx123456789xX@', // كلمة مرور المدير الافتراضية
                 theme: 'light',
                 logo: '',
                 initialized: true,
@@ -259,16 +261,21 @@ class Database {
         try {
             const table = this.getTable(tableName);
             const filteredTable = table.filter(item => item.id !== id);
-            
+
             if (filteredTable.length < table.length) {
                 return this.setTable(tableName, filteredTable);
             }
-            
+
             return false;
         } catch (error) {
             console.error(`خطأ في حذف عنصر من ${tableName}:`, error);
             return false;
         }
+    }
+
+    // حذف سجل (اسم بديل للتوافق)
+    deleteRecord(tableName, id) {
+        return this.delete(tableName, id);
     }
 
     // البحث عن عنصر بالمعرف
