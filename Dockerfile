@@ -19,7 +19,6 @@ COPY style.css /usr/share/nginx/html/
 COPY database.js /usr/share/nginx/html/
 COPY main.js /usr/share/nginx/html/
 COPY app.js /usr/share/nginx/html/
-COPY sample-data.js /usr/share/nginx/html/
 
 # Copy all JavaScript modules
 COPY js/ /usr/share/nginx/html/js/
