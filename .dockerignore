@@ -1,0 +1,61 @@
+# Docker ignore file for ABUSLEMAN
+
+# Documentation
+*.md
+docs/
+README*
+
+# Test files
+test/
+tests/
+*.test.js
+*.test.ts
+test-results/
+playwright-report/
+playwright/
+
+# Debug files
+debug-*
+final-*
+quick-*
+test-*
+
+# Git
+.git/
+.github/
+.gitignore
+
+# Node modules
+node_modules/
+package.json
+package-lock.json
+yarn.lock
+
+# Environment files
+.env
+.env.*
+*.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files (don't include in image)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Backup files
+*.backup
+*.bak
+
+# Temporary files
+*.tmp
+*.temp

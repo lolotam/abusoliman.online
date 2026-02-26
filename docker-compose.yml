@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  abusleman-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: abusleman-inventory
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    labels:
+      - "com.abusleman.description=Arabic Inventory Management System"
+      - "com.abusleman.version=1.0.0"
+    # Optional: Add volume for persistent data backup
+    # volumes:
+    #   - ./backups:/usr/share/nginx/html/backups
